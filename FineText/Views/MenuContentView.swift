@@ -23,6 +23,19 @@ struct MenuContentView: View {
     .background(Color(nsColor: .windowBackgroundColor))
     .animation(.snappy(duration: 0.25), value: workspace.route)
     .overlay(alignment: .bottom) { ToastOverlay() }
+    .onAppear { AppAnalytics.screen(screenName) }
+    .onChange(of: workspace.route) { AppAnalytics.screen(screenName) }
+    .onChange(of: workspace.tab) { AppAnalytics.screen(screenName) }
+  }
+
+  private var screenName: String {
+    switch workspace.route {
+    case nil: "home_\(workspace.tab.rawValue.lowercased())"
+    case .rewrite: "rewrite_detail"
+    case .translation: "translation_detail"
+    case .image: "image_detail"
+    case .history: "history"
+    }
   }
 }
 
@@ -108,7 +121,7 @@ struct HomeView: View {
     } message: {
       Text(LocalizableKey.startsANewSessionTheCurrentOneStaysInHistory.string)
     }
-    .sheet(isPresented: $showCosts) { CostsSheet() }
+    .sheet(isPresented: $showCosts) { CostsSheet().onAppear { AppAnalytics.screen("costs") } }
   }
 
   private var runTitle: String {
@@ -256,7 +269,7 @@ struct RewriteSection: View {
         )
       }
     }
-    .sheet(isPresented: $showCustomPlatforms) { CustomPlatformsSheet() }
+    .sheet(isPresented: $showCustomPlatforms) { CustomPlatformsSheet().onAppear { AppAnalytics.screen("custom_platforms") } }
   }
 }
 

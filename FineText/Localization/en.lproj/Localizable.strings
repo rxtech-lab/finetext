@@ -394,3 +394,6 @@
 "chatVariant" = "Chat";
 
 "newThread" = "New thread";
+"privacy" = "Privacy";
+"shareAnonymousUsageAnalytics" = "Share anonymous usage analytics";
+"analyticsDescription" = "Sends which features and models you use, never your text, images or API keys.";

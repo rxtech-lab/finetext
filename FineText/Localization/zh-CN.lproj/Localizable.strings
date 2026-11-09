@@ -394,3 +394,6 @@
 "chatVariant" = "聊天";
 
 "newThread" = "新建会话";
+"privacy" = "隐私";
+"shareAnonymousUsageAnalytics" = "共享匿名使用数据";
+"analyticsDescription" = "仅发送你使用的功能和模型，绝不发送你的文字、图片或 API 密钥。";

@@ -120,6 +120,9 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case automaticallyCheckForUpdates
   case version
   case updatesAreAvailableInReleaseBuildsOnly
+  case privacy
+  case shareAnonymousUsageAnalytics
+  case analyticsDescription
   case status
   case location
   case detectAgain

@@ -14,6 +14,7 @@ import SwiftUI
 
   init() {
     DefaultsKey.register()
+    AppAnalytics.configure()
     let container = Persistence.makeContainer()
     let providers = ProviderStore()
     let preferences = Preferences()

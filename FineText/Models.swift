@@ -341,6 +341,7 @@ enum DefaultsKey {
   static let preferences = "preferences"
   static let localModels = "localModels"
   static let settingsTab = "settingsTab"
+  static let analyticsEnabled = "analyticsEnabled"
 
   static func register() {
     UserDefaults.standard.register(defaults: [
@@ -362,6 +363,8 @@ struct CostSummary {
   let charges: [GenerationCharge]
   var total: Double { charges.compactMap(\.costUSD).reduce(0, +) }
   var unknownCount: Int { charges.filter { $0.costUSD == nil }.count }
+  /// Sum of known costs, or nil when no charge has a known amount.
+  var knownTotal: Double? { charges.contains { $0.costUSD != nil } ? total : nil }
   var hasEstimate: Bool { charges.contains { $0.estimated } }
   var totalLabel: String { charges.isEmpty ? Self.usd(0) : label }
   var label: String {

@@ -84,6 +84,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     session = fresh
     route = nil
     save()
+    AppAnalytics.log(.sessionCleared)
     flash(LocalizableKey.cleared.string, symbol: "sparkles")
   }
 
@@ -95,6 +96,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     touch()
     route = nil
     save()
+    AppAnalytics.log(.sessionOpened)
   }
 
   func deleteSession(_ other: RefinementSession) {
@@ -106,6 +108,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     }
     context.delete(other)
     save()
+    AppAnalytics.log(.sessionDeleted)
     flash(LocalizableKey.sessionDeleted.string, symbol: "trash")
   }
 
@@ -133,6 +136,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   func copy(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+    AppAnalytics.log(.outputCopied, ["feature": analyticsFeature(of: text)])
     flash(LocalizableKey.copiedToClipboard.string, symbol: "doc.on.doc")
   }
 
@@ -144,6 +148,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     preferences.remember(model, for: .rewrite)
     let item = RewriteItem(platform: platform, tone: preferences.tone(for: platform), model: model)
     session.rewrites.append(item)
+    AppAnalytics.log(.itemAdded, rewriteParameters(item))
     touch()
     Haptics.tap()
     return item
@@ -159,6 +164,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     item.customPlatformInstruction = customPlatform.instruction
     item.tone = preferences.tone(for: item)
     session.rewrites.append(item)
+    AppAnalytics.log(.itemAdded, rewriteParameters(item))
     touch()
     save()
     Haptics.tap()
@@ -171,6 +177,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     preferences.remember(model, for: .translate)
     let item = TranslationItem(language: language, model: model, sourceRewriteID: source)
     session.translations.append(item)
+    AppAnalytics.log(.itemAdded, translationParameters(item))
     touch()
     Haptics.tap()
     return item
@@ -181,6 +188,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     preferences.remember(model, for: .image)
     let item = ImageItem(model: model)
     session.images.append(item)
+    AppAnalytics.log(.itemAdded, imageParameters(item))
     touch()
     Haptics.tap()
     return item
@@ -209,6 +217,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   // MARK: Run
 
   func runAll() {
+    AppAnalytics.log(.runAll, ["feature": tab.rawValue.lowercased(), "item_count": runAllCount])
     switch tab {
     case .rewrite: session.sortedRewrites.forEach(run)
     case .translate: session.sortedTranslations.forEach(run)
@@ -225,13 +234,33 @@ enum WorkTab: String, CaseIterable, Identifiable {
     }
   }
 
+  private var runAllCount: Int {
+    switch tab {
+    case .rewrite: session.rewrites.count
+    case .translate: session.translations.count
+    case .image: session.images.count
+    }
+  }
+
   var isRunningAny: Bool { statuses.values.contains { $0.isRunning } }
 
-  private func start(_ id: UUID, _ work: @escaping @MainActor () async throws -> Void) {
+  private func start(_ id: UUID, analytics: [String: Any] = [:],
+                     completion: (@MainActor () -> [String: Any])? = nil,
+                     _ work: @escaping @MainActor () async throws -> Void) {
     tasks[id]?.cancel()
     let token = UUID()
     taskTokens[id] = token
     statuses[id] = .running(LocalizableKey.starting.string)
+    let started = Date.now
+    let existingCharges = Set(charges.filter { $0.itemID == id }.map(\.persistentModelID))
+    AppAnalytics.log(.generationStarted, analytics)
+    func finished() -> [String: Any] {
+      let newCharges = charges.filter { $0.itemID == id && !existingCharges.contains($0.persistentModelID) }
+      var parameters = analytics
+      parameters["duration_ms"] = Int(Date.now.timeIntervalSince(started) * 1000)
+      if let cost = CostSummary(charges: newCharges).knownTotal { parameters["cost_usd"] = cost }
+      return parameters
+    }
     tasks[id] = Task {
       do {
         try await work()
@@ -239,12 +268,16 @@ enum WorkTab: String, CaseIterable, Identifiable {
         guard taskTokens[id] == token else { return }
         statuses[id] = .done
         save()
+        AppAnalytics.log(.generationCompleted, finished().merging(completion?() ?? [:]) { _, new in new })
       } catch is CancellationError {
         if taskTokens[id] == token { statuses[id] = .idle }
+        AppAnalytics.log(.generationCancelled, finished())
       } catch let error as URLError where error.code == .cancelled {
         if taskTokens[id] == token { statuses[id] = .idle }
+        AppAnalytics.log(.generationCancelled, finished())
       } catch {
         if taskTokens[id] == token { statuses[id] = .failed(error.localizedDescription) }
+        AppAnalytics.log(.generationFailed, finished().merging(["error_type": AppAnalytics.errorType(error)]) { _, new in new })
       }
       if taskTokens[id] == token { tasks[id] = nil; taskTokens[id] = nil; save() }
     }
@@ -257,7 +290,20 @@ enum WorkTab: String, CaseIterable, Identifiable {
     let messages = Prompts.rewrite(text, platform: item.platform, tone: item.tone, customName: item.customPlatformName, customInstruction: item.customPlatformInstruction)
     preferences.setTone(item.tone, for: item)
     let model = item.model
-    start(id) {
+    var parameters = rewriteParameters(item)
+    let defaults = UserDefaults.standard
+    parameters["humanization_mode"] = HumanizationMode.selected(in: defaults).rawValue
+    parameters["humanization_engine"] = defaults.string(forKey: DefaultsKey.humanizationEngine) ?? ""
+    parameters["detector"] = AIDetectorEngine.selected.rawValue
+    parameters["input_chars"] = text.count
+    start(id, analytics: parameters, completion: {
+      var result: [String: Any] = ["humanization_rounds": item.humanizationRounds, "output_chars": item.output.count,
+                                   "humanization_stopped": item.note != nil]
+      if let score = item.initialAIScore { result["initial_ai_score"] = score }
+      if let score = item.finalAIScore { result["final_ai_score"] = score }
+      if let target = item.targetAIScore, let score = item.finalAIScore { result["ai_target_reached"] = score <= target }
+      return result
+    }) {
       item.refinementSource = text
       item.output = ""
       item.note = nil
@@ -470,7 +516,9 @@ enum WorkTab: String, CaseIterable, Identifiable {
     let messages = Prompts.translate(text, to: item.language)
     let model = item.model
     let status = LocalizableKey.translatingTo.format(item.language.localizedName)
-    start(id) {
+    var parameters = translationParameters(item)
+    parameters["input_chars"] = text.count
+    start(id, analytics: parameters) {
       item.output = ""
       let raw = try await self.chat(model, messages: messages, id: id, status: status) { delta in item.output += delta }
       item.output = Prompts.clean(raw)
@@ -491,7 +539,10 @@ enum WorkTab: String, CaseIterable, Identifiable {
     }
     let mode = backgroundMode(for: item)
     let prompt = Prompts.image(post: text, instruction: item.instruction, background: mode)
-    start(item.id) {
+    var parameters = imageParameters(item)
+    parameters["background"] = mode.analyticsName
+    parameters["has_instruction"] = !item.instruction.trimmed.isEmpty
+    start(item.id, analytics: parameters) {
       let (image, raw) = try await self.renderImage(item, prompt: prompt, mode: mode, input: nil, fallbackPrompt: nil)
       item.imageData = image
       item.rawImageData = raw
@@ -515,7 +566,10 @@ enum WorkTab: String, CaseIterable, Identifiable {
     let combinedDirection = [item.instruction.trimmed, change].filter { !$0.isEmpty }.joined(separator: "\n")
     let fallback = Prompts.image(post: originalText.trimmed, instruction: combinedDirection, background: mode)
     Haptics.tap()
-    start(item.id) {
+    var parameters = imageParameters(item)
+    parameters["feature"] = "image_refine"
+    parameters["background"] = mode.analyticsName
+    start(item.id, analytics: parameters) {
       let (image, raw) = try await self.renderImage(item, prompt: prompt, mode: mode, input: input, fallbackPrompt: fallback)
       item.previousImageData = item.imageData
       item.previousRawImageData = item.rawImageData
@@ -533,6 +587,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     item.previousRawImageData = nil
     touch()
     save()
+    AppAnalytics.log(.imageRefinementUndone)
     flash(LocalizableKey.refinementUndone.string, symbol: "arrow.uturn.backward")
   }
 
@@ -596,6 +651,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
     guard let data = item.imageData, let image = NSImage(data: data) else { return }
     NSPasteboard.general.clearContents()
     NSPasteboard.general.writeObjects([image])
+    AppAnalytics.log(.outputCopied, ["feature": "image"])
     flash(LocalizableKey.imageCopied.string, symbol: "photo.on.rectangle")
   }
 
@@ -613,6 +669,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
       let name = "FineText \(Date.now.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false).timeSeparator(.omitted))).png"
       let url = folder.appending(path: name)
       try Self.png(data).write(to: url)
+      AppAnalytics.log(.imageSaved, ["destination": "pictures"])
       flash(LocalizableKey.savedToPicturesFinetext.string, symbol: "square.and.arrow.down")
     } catch {
       flash(LocalizableKey.saveFailed.format(error.localizedDescription), symbol: "xmark.octagon", isError: true)
@@ -629,10 +686,43 @@ enum WorkTab: String, CaseIterable, Identifiable {
     guard panel.runModal() == .OK, let url = panel.url else { return }
     do {
       try Self.png(data).write(to: url)
+      AppAnalytics.log(.imageSaved, ["destination": "save_panel"])
       flash(LocalizableKey.imageSaved.string, symbol: "square.and.arrow.down")
     } catch {
       flash(LocalizableKey.saveFailed.format(error.localizedDescription), symbol: "xmark.octagon", isError: true)
     }
+  }
+
+  // MARK: Analytics
+
+  private func rewriteParameters(_ item: RewriteItem) -> [String: Any] {
+    AppAnalytics.modelParameters(item.model, providers: providers).merging([
+      "feature": "rewrite",
+      "platform": item.customPlatformID == nil ? item.platform.rawValue : "custom",
+      "tone": item.tone.rawValue,
+    ]) { _, new in new }
+  }
+
+  private func translationParameters(_ item: TranslationItem) -> [String: Any] {
+    AppAnalytics.modelParameters(item.model, providers: providers).merging([
+      "feature": "translate",
+      "language": item.language.code,
+      "source": item.sourceRewriteID == nil ? "original" : "rewrite",
+    ]) { _, new in new }
+  }
+
+  private func imageParameters(_ item: ImageItem) -> [String: Any] {
+    AppAnalytics.modelParameters(item.model, providers: providers).merging([
+      "feature": "image",
+      "size": item.size.rawValue,
+      "transparent": item.transparentBackground,
+    ]) { _, new in new }
+  }
+
+  private func analyticsFeature(of text: String) -> String {
+    if session.rewrites.contains(where: { $0.output == text }) { return "rewrite" }
+    if session.translations.contains(where: { $0.output == text }) { return "translate" }
+    return "other"
   }
 
   private static func png(_ data: Data) -> Data {
@@ -730,6 +820,14 @@ enum Prompts {
 }
 
 extension BackgroundMode {
+  var analyticsName: String {
+    switch self {
+    case .opaque: "opaque"
+    case .native: "native_transparent"
+    case .greenScreen: "green_screen"
+    }
+  }
+
   /// Background instructions appended to image prompts.
   var directive: String? {
     switch self {

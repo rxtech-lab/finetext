@@ -215,6 +215,7 @@ actor AIDetector {
         guard operation == token else { return }
         state = .installed
         runtimeReady = true
+        AppAnalytics.log(.modelDownloaded, ["model_kind": "ai_detector", "model": engine.rawValue])
         Haptics.success()
       } catch is CancellationError {
         if operation == token { state = .notInstalled }
@@ -241,6 +242,7 @@ actor AIDetector {
       do {
         try await AIDetector.shared.remove(engine)
         state = .notInstalled
+        AppAnalytics.log(.modelRemoved, ["model_kind": "ai_detector", "model": engine.rawValue])
         Haptics.success()
       } catch { state = .failed(error.localizedDescription); Haptics.failure() }
     }
