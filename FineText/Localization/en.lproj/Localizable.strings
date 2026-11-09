@@ -392,6 +392,10 @@
 "historyTitle" = "History title";
 
 "chatVariant" = "Chat";
+"titleVariant" = "Title";
+"descriptionVariant" = "Description";
+"taglineVariant" = "Tagline";
+"makerCommentVariant" = "Maker Comment";
 
 "newThread" = "New thread";
 "privacy" = "Privacy";

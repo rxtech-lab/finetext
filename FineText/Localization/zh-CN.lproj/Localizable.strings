@@ -392,6 +392,10 @@
 "historyTitle" = "历史标题";
 
 "chatVariant" = "聊天";
+"titleVariant" = "标题";
+"descriptionVariant" = "简介";
+"taglineVariant" = "宣传语";
+"makerCommentVariant" = "创作者留言";
 
 "newThread" = "新建会话";
 "privacy" = "隐私";
