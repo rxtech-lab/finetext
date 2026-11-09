@@ -4,6 +4,8 @@ import Foundation
 
 enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
   case x, xReply, xThread, reddit, redditComment, linkedin, linkedinComment, linkedinChat, blog, message
+  case youtubeComment, youtubeTitle, youtubeDescription
+  case productHunt, productHuntComment, productHuntReply, productHuntTagline, productHuntDescription, productHuntMakerComment
 
   var id: String { rawValue }
 
@@ -12,19 +14,25 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .x, .xReply, .xThread: "X · \(variantTitle)"
     case .reddit, .redditComment: "Reddit · \(variantTitle)"
     case .linkedin, .linkedinComment, .linkedinChat: "LinkedIn · \(variantTitle)"
+    case .youtubeComment, .youtubeTitle, .youtubeDescription: "YouTube · \(variantTitle)"
+    case .productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment:
+      "Product Hunt · \(variantTitle)"
     case .blog: LocalizableKey.blogPost.string
     case .message: LocalizableKey.message.string
     }
   }
 
   /// Top-level entries; variants are selected in a submenu before the model.
-  static let menuPlatforms: [Platform] = [.x, .reddit, .linkedin, .blog, .message]
+  static let menuPlatforms: [Platform] = [.x, .reddit, .linkedin, .youtubeComment, .productHunt, .blog, .message]
 
   var variants: [Platform] {
     switch self {
     case .x, .xReply, .xThread: [.x, .xReply, .xThread]
     case .reddit, .redditComment: [.reddit, .redditComment]
     case .linkedin, .linkedinComment, .linkedinChat: [.linkedin, .linkedinComment, .linkedinChat]
+    case .youtubeComment, .youtubeTitle, .youtubeDescription: [.youtubeComment, .youtubeTitle, .youtubeDescription]
+    case .productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment:
+      [.productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment]
     default: []
     }
   }
@@ -34,16 +42,23 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .x, .xReply, .xThread: "X"
     case .reddit, .redditComment: "Reddit"
     case .linkedin, .linkedinComment, .linkedinChat: "LinkedIn"
+    case .youtubeComment, .youtubeTitle, .youtubeDescription: "YouTube"
+    case .productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment:
+      "Product Hunt"
     default: title
     }
   }
 
   var variantTitle: String {
     switch self {
-    case .x, .reddit, .linkedin: LocalizableKey.postVariant.string
-    case .xReply: LocalizableKey.replyVariant.string
+    case .x, .reddit, .linkedin, .productHunt: LocalizableKey.postVariant.string
+    case .xReply, .productHuntReply: LocalizableKey.replyVariant.string
     case .xThread: LocalizableKey.threadVariant.string
-    case .redditComment, .linkedinComment: LocalizableKey.commentVariant.string
+    case .redditComment, .linkedinComment, .youtubeComment, .productHuntComment: LocalizableKey.commentVariant.string
+    case .youtubeTitle: LocalizableKey.titleVariant.string
+    case .youtubeDescription, .productHuntDescription: LocalizableKey.descriptionVariant.string
+    case .productHuntTagline: LocalizableKey.taglineVariant.string
+    case .productHuntMakerComment: LocalizableKey.makerCommentVariant.string
     case .linkedinChat: LocalizableKey.chatVariant.string
     default: title
     }
@@ -60,6 +75,15 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .linkedin: "LinkedIn Post"
     case .linkedinComment: "LinkedIn Comment"
     case .linkedinChat: "LinkedIn Chat"
+    case .youtubeComment: "YouTube Comment"
+    case .youtubeTitle: "YouTube Title"
+    case .youtubeDescription: "YouTube Description"
+    case .productHunt: "Product Hunt Post"
+    case .productHuntComment: "Product Hunt Comment"
+    case .productHuntReply: "Product Hunt Reply"
+    case .productHuntTagline: "Product Hunt Tagline"
+    case .productHuntDescription: "Product Hunt Description"
+    case .productHuntMakerComment: "Product Hunt Maker Comment"
     case .blog: "Blog Post"
     case .message: "Message"
     }
@@ -72,6 +96,11 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .linkedin: "briefcase"
     case .linkedinComment: "text.bubble"
     case .linkedinChat: "message"
+    case .youtubeComment: "text.bubble"
+    case .youtubeTitle, .youtubeDescription: "play.rectangle"
+    case .productHunt, .productHuntTagline, .productHuntDescription: "sparkles"
+    case .productHuntComment, .productHuntMakerComment: "text.bubble"
+    case .productHuntReply: "arrowshape.turn.up.left"
     case .blog: "doc.richtext"
     case .message: "message"
     }
@@ -83,6 +112,14 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .reddit, .redditComment: .casual
     case .linkedin: .professional
     case .linkedinComment, .linkedinChat: .natural
+    case .youtubeComment: .casual
+    case .youtubeTitle: .concise
+    case .youtubeDescription: .informative
+    case .productHunt: .enthusiastic
+    case .productHuntComment, .productHuntReply: .natural
+    case .productHuntTagline: .concise
+    case .productHuntDescription: .informative
+    case .productHuntMakerComment: .friendly
     case .blog: .storytelling
     case .message: .natural
     }
@@ -151,6 +188,70 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
       - Preserve the author's intent, relationship and level of familiarity; do not invent prior contact.
       - No title, hashtags, public call to action, unsolicited sales pitch, or formal email sign-off.
       - Avoid canned greetings and networking clichés. Keep any request direct and low-pressure.
+      """
+    case .youtubeComment:
+      """
+      - A single YouTube comment: concise, conversational, and relevant to the source.
+      - Preserve the author's point and tone. Do not invent video details, quotes, or context about other commenters.
+      - No title, hashtags, promotional pitch, or generic praise. Output only the comment.
+      """
+    case .youtubeTitle:
+      """
+      - A single concise YouTube video title on one line. Output only the title, without quotes or a label.
+      - Put the main topic first and make the value clear using natural, specific wording.
+      - Preserve the source meaning. Avoid misleading clickbait, exaggerated promises, all caps, and hashtag walls.
+      - Do not invent names, numbers, outcomes, or video content. Do not provide multiple alternatives.
+      """
+    case .youtubeDescription:
+      """
+      - A YouTube video description with a clear opening summary, followed by short, readable paragraphs as needed.
+      - Explain the topic and value using only information in the source. Preserve any supplied links and credits.
+      - Do not invent timestamps, chapters, URLs, sponsors, social handles, or claims about the video.
+      - No title or description label, forced subscription pitch, or hashtag walls. Output only the description.
+      """
+    case .productHunt:
+      """
+      - A Product Hunt launch post: introduce the product, the problem it solves, and who it helps.
+      - Lead with the concrete value, then use short paragraphs for the key features supported by the source.
+      - Keep enthusiasm grounded and invite useful feedback naturally. No hashtag walls or requests for upvotes.
+      - Preserve supplied product names and links. Do not invent features, pricing, metrics, testimonials, or launch status.
+      - Output only the post, without a label or extra alternatives.
+      """
+    case .productHuntComment:
+      """
+      - A concise Product Hunt community comment, responding to the specific point in the source.
+      - Keep it thoughtful and conversational; preserve any feedback or question rather than substituting generic praise.
+      - Do not pretend to have tried the product or invent features, experiences, or a relationship with the maker.
+      - No title, hashtags, promotional pitch, or requests for upvotes. Output only the comment.
+      """
+    case .productHuntReply:
+      """
+      - A direct, conversational reply to a Product Hunt comment or question.
+      - Address the point in the source, preserving the author's role and intent without inventing the parent comment.
+      - Do not invent product capabilities, commitments, roadmap dates, or personal experiences.
+      - Keep it focused and helpful, without a title, hashtags, or requests for upvotes. Output only the reply.
+      """
+    case .productHuntTagline:
+      """
+      - A single short Product Hunt product tagline on one line, without quotes or a label.
+      - State what the product does or its main benefit in plain, specific language; put the core idea first.
+      - Preserve the source meaning. Avoid jargon, vague superlatives, unsupported comparisons, and invented claims.
+      - No hashtags, calls to action, or multiple alternatives. Output only the tagline.
+      """
+    case .productHuntDescription:
+      """
+      - A compact Product Hunt product description explaining what it does, who it helps, and the main benefit.
+      - Use a few clear sentences grounded in the source, prioritizing concrete capabilities over marketing adjectives.
+      - Preserve supplied product names and links. Do not invent features, pricing, integrations, or results.
+      - No title, hashtags, requests for upvotes, or extra alternatives. Output only the description.
+      """
+    case .productHuntMakerComment:
+      """
+      - An introductory Product Hunt maker comment, written in the maker's natural voice.
+      - Use the source to explain why the product was built, the problem it addresses, and what makes it useful.
+      - Use short paragraphs and close with an invitation for questions or specific feedback when appropriate.
+      - Preserve the source's singular or team voice. Do not invent a founder story, users, traction, offers, or roadmap promises.
+      - No title, hashtags, or requests for upvotes. Output only the maker comment.
       """
     case .blog:
       """

@@ -18,6 +18,10 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case postVariant
   case commentVariant
   case chatVariant
+  case titleVariant
+  case descriptionVariant
+  case taglineVariant
+  case makerCommentVariant
   case replyVariant
   case threadVariant
   case customPlatforms
