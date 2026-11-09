@@ -14,14 +14,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const t = messages[locale];
-  const socialImage = { url: "/og-image.png", width: 1752, height: 897, alt: t.previewNote };
   return {
     metadataBase: new URL("https://fintext.app"),
     title: `FineText — ${t.title}`, description: t.description,
     icons: { icon: "/icon.svg", apple: "/icon.svg" },
     alternates: { canonical: `/${locale}`, languages: { en: "/en", "zh-CN": "/zh-CN", "zh-TW": "/zh-TW", "zh-HK": "/zh-HK", "x-default": "/" } },
-    openGraph: { title: `FineText — ${t.title}`, description: t.description, locale: locale.replace("-", "_"), type: "website", url: `/${locale}`, siteName: "FineText", images: [socialImage] },
-    twitter: { card: "summary_large_image", title: `FineText — ${t.title}`, description: t.description, images: [socialImage] },
+    openGraph: { title: `FineText — ${t.title}`, description: t.description, locale: locale.replace("-", "_"), type: "website", url: `/${locale}`, siteName: "FineText" },
+    twitter: { card: "summary_large_image", title: `FineText — ${t.title}`, description: t.description },
   };
 }
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {

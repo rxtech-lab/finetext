@@ -55,28 +55,30 @@ import AppKit
     let swapSource = [word("alpha", x: 0), word("beta", x: 80)]
     let swapTarget = [word("beta", x: 0), word("alpha", x: 80)]
     let swap = RefinementMovementPlan(from: swapSource, to: swapTarget)
-    assert(swap.relocatedIDs == Set(swapSource.map(\.id)), "Swapping words must not slide through each other")
+    assert(swap.relocatedIDs.count == 1, "Swapped words must not slide through each other; one glides, one relocates")
     let clear = RefinementMovementPlan(from: [word("alpha", x: 0), word("beta", x: 150)],
                                        to: [word("alpha", x: 45), word("beta", x: 150)])
     assert(clear.relocatedIDs.isEmpty, "A clear movement path should retain the slide animation")
     let wrapping = RefinementMovementPlan(from: [word("alpha", x: 80), word("beta", x: 0, y: 20)],
                                           to: [word("alpha", x: 0, y: 20), word("beta", x: 40, y: 20)])
-    assert(!wrapping.relocatedIDs.isEmpty, "Line wraps must not slide into occupied text")
+    assert(wrapping.relocatedIDs.isEmpty, "Unchanged words magic-move across line wraps")
+    let inserted = RefinementMovementPlan(from: [word("alpha", x: 0), word("beta", x: 40)],
+                                          to: [word("new", x: 0), word("alpha", x: 40), word("beta", x: 80)])
+    assert(inserted.relocatedIDs.isEmpty, "Unchanged words glide past insertions instead of fading")
     let paragraphs = "Mixed English 和中文文字，with 👩🏽‍💻 emoji and café.\n\n" + String(repeating: "Long words wrap safely. ", count: 10)
     let compact = RefinementWordLayout(text: paragraphs, width: 150)
     let expanded = RefinementWordLayout(text: paragraphs, width: 350)
     let resizing = RefinementMovementPlan(from: compact.words, to: expanded.words)
-    let startRects = Dictionary(uniqueKeysWithValues: compact.words.map { ($0.id, $0.rect) })
-    for item in expanded.words where !resizing.relocatedIDs.contains(item.id) {
-      guard let start = startRects[item.id], start != item.rect else { continue }
-      let path = start.union(item.rect)
-      for other in expanded.words where other.id != item.id {
-        let otherPath = startRects[other.id].map { $0.union(other.rect) } ?? other.rect
-        let intersection = path.intersection(otherPath)
-        assert(intersection.isNull || intersection.width <= 0.25 || intersection.height <= 0.25,
-               "Every visible slide must be free of other glyph paths")
-      }
-    }
+    assert(resizing.relocatedIDs.isEmpty, "Reflowed text keeps reading order, so every word glides")
+    let edited = RefinementWordLayout(text: "We have been building something new and cannot wait to share it next week.", width: 200)
+    let refined = RefinementWordLayout(text: "Something new is taking shape. We cannot wait to share it with you next week.", width: 200)
+    let editMove = RefinementMovementPlan(from: edited.words.filter { word in refined.words.contains { $0.id == word.id } },
+                                          to: refined.words)
+    let order = RefinementMovementPlan.readingOrderIDs(from: edited.words, to: refined.words)
+    assert(editMove.relocatedIDs.isDisjoint(with: order), "In-order unchanged words are never hidden")
+    let orderedTargets = refined.words.filter { order.contains($0.id) }
+    let orderedSources = edited.words.filter { order.contains($0.id) }
+    assert(orderedTargets.map(\.id) == orderedSources.map(\.id), "Gliding words keep their relative reading order")
     for preparation in [0.0, 0.4, 1.5, 2.0] {
       let timing = RefinementAnimationTiming(preparationSeconds: preparation)
       let duration = RefinementAnimationTiming.Phase.allCases.reduce(0.0) { $0 + timing.scaled($1.duration) }
@@ -87,6 +89,6 @@ import AppKit
     assert(RefinementAnimationTiming().scale == 1, "Normal transitions keep full smooth easing durations")
     assert(RefinementAnimationTiming(preparationSeconds: 2).scale == 0,
            "A delayed frame must settle without extending playback")
-    print("Passed layout, categories, collision-free movement and whole-sequence duration checks.")
+    print("Passed layout, categories, magic-move and whole-sequence duration checks.")
   }
 }

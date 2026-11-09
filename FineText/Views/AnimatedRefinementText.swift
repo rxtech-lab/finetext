@@ -182,7 +182,7 @@ struct AnimatedRefinementText: View {
       }
       try await pause(.mark)
 
-      // Deletions and collision-prone words fade in parallel before reflow begins.
+      // Deletions and reordered words that would cross gliding text fade before reflow begins.
       transition(.easeOut(duration: timing.scaled(RefinementAnimationTiming.Phase.fade.duration))) {
         words = words.map { item in
           var item = item
@@ -272,7 +272,13 @@ struct AnimatedRefinementText: View {
                             y: mix(old.word.rect.minY, item.word.rect.minY),
                             width: mix(old.word.rect.width, item.word.rect.width),
                             height: mix(old.word.rect.height, item.word.rect.height))
-          let opacity = old.opacity + (item.opacity - old.opacity) * progress
+          // Entering words bloom late so gliding text has mostly cleared their space.
+          let fadeProgress = old.opacity < item.opacity ? progress * progress : progress
+          var opacity = old.opacity + (item.opacity - old.opacity) * fadeProgress
+          // Words wrapping to another line soften mid-flight so they read as passing behind text.
+          if abs(old.word.rect.minY - item.word.rect.minY) > 0.5 {
+            opacity *= 1 - 0.45 * sin(.pi * progress)
+          }
           guard opacity > 0.001 else { continue }
           let reveal = mix(old.reveal, item.reveal)
           let strike = mix(old.strike, item.strike)
