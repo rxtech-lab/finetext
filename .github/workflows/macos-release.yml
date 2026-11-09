@@ -112,9 +112,16 @@ jobs:
         run: |
           gh release upload "$VERSION" FineText.dmg --clobber
           gh release edit "$VERSION" --draft=false
-      - uses: actions/upload-pages-artifact@v3
+      # Package the Pages artifact on Ubuntu, where GNU tar is available.
+      - name: Upload update site for deployment
+        uses: actions/upload-artifact@v4
         with:
+          name: update-site-${{ github.run_id }}
           path: output/pages
+          overwrite: true
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
   deploy:
     needs: release
     runs-on: ubuntu-latest
@@ -125,6 +132,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Download update site
+        uses: actions/download-artifact@v4
+        with:
+          name: update-site-${{ github.run_id }}
+          path: pages
       - uses: actions/configure-pages@v5
+      - name: Package Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
       - uses: actions/deploy-pages@v4
         id: deployment

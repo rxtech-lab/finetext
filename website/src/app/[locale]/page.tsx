@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { Button, Chip } from "@mui/material";
-import { isLocale, locales } from "@/lib/locales";
+import { connection } from "next/server";
+import { Button } from "@mui/material";
+import { isLocale } from "@/lib/locales";
 import { messages } from "@/lib/messages";
 import { getLatestRelease } from "@/lib/releases";
 import { repository } from "@/lib/release-data";
 import { LanguagePicker } from "@/components/language-picker";
 import { Icon } from "@/components/icon";
-export const revalidate = 300;
-export function generateStaticParams() { return locales.map(locale => ({ locale })); }
+import { ModelChips } from "@/components/model-chips";
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
@@ -28,6 +28,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const t = messages[locale];
+  await connection();
   const release = await getLatestRelease();
   return <>
     <a href="#main" className="skip-link">{t.skip}</a>
@@ -45,7 +46,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             {release ? <Button href={release.downloadUrl} variant="contained" size="large" startIcon={<Icon kind="download" />}>{t.download}</Button> : <Button href={`${repository}/releases`} variant="contained" size="large" endIcon={<Icon kind="arrow" />}>{t.github}</Button>}
             {release && <a className="text-link" href={release.url}>{t.releaseNotes}<Icon kind="arrow" /></a>}
           </div>
-          <p className="requirements">{t.requirements}{release && <> · {release.version} · {Math.ceil(release.size / 1024 / 1024)} MB</>}</p>
+          <p className="requirements">{t.requirements}{release && <> · {release.version}{release.size !== null && <> · {Math.ceil(release.size / 1024 / 1024)} MB</>}</>}</p>
           {!release && <div className="release-status"><span className="status-dot" aria-hidden="true"/><div><strong>{t.unavailable}</strong><p>{t.unavailableDetail}</p></div></div>}
         </div>
         <figure className="preview" aria-label={t.previewNote}>
@@ -69,7 +70,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           <h3>{feature.title}</h3><p>{feature.body}</p>
         </article>)}</div>
       </section>
-      <section className="model-section wrap"><div className="model-inner"><div><p className="eyebrow">{t.modelLabel}</p><h2>{t.modelTitle}</h2><p className="model-body">{t.modelBody}</p><a href={repository} className="text-link">{t.github}<Icon kind="arrow"/></a></div><div className="model-options">{t.modelChips.map((label, i) => <Chip key={label} label={label} variant="outlined" icon={<span className="chip-dot" style={{background: ["#3f7d6e", "#6b739b", "#b4854c", "#6c8fa2"][i]}}/>}/>)}</div></div></section>
+      <section className="model-section wrap"><div className="model-inner"><div><p className="eyebrow">{t.modelLabel}</p><h2>{t.modelTitle}</h2><p className="model-body">{t.modelBody}</p><a href={repository} className="text-link">{t.github}<Icon kind="arrow"/></a></div><ModelChips labels={t.modelChips}/></div></section>
     </main>
     <footer className="footer wrap"><div><a href={`/${locale}`} className="brand"><Image src="/icon.svg" alt="" width={28} height={28}/>FineText</a><p>{t.footer}</p></div><div className="footer-links"><a href={repository}>{t.source}</a><span>© {new Date().getFullYear()} RxLab</span></div></footer>
   </>;
