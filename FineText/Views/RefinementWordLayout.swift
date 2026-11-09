@@ -144,26 +144,57 @@ struct RefinementChangePlan {
   }
 }
 
-/// Only slide words whose whole travel area is free. Other words fade out, relocate while
-/// invisible, then return at their destination; they never cross another visible glyph run.
+/// Magic move: every shared word that keeps its reading order glides to its new position,
+/// including line wraps, so unchanged text visibly flows around insertions and deletions.
+/// In-order words travel together and never overtake one another, while insertions are
+/// still invisible when the glide starts. Only reordered words whose path would pass through
+/// gliding text fade out, relocate while invisible, and return at their destination.
 struct RefinementMovementPlan {
-  let relocatedIDs: Set<RefinementWordLayout.Word.ID>
+  typealias Word = RefinementWordLayout.Word
+  let relocatedIDs: Set<Word.ID>
 
-  init(from source: [RefinementWordLayout.Word], to target: [RefinementWordLayout.Word]) {
+  init(from source: [Word], to target: [Word]) {
     let sourceRects = Dictionary(uniqueKeysWithValues: source.map { ($0.id, $0.rect) })
-    let paths = target.map { word in
-      (id: word.id, rect: sourceRects[word.id].map { $0.union(word.rect) } ?? word.rect)
+    let ordered = Self.readingOrderIDs(from: source, to: target)
+    var gliding: [CGRect] = []
+    for word in target where ordered.contains(word.id) {
+      gliding.append(sourceRects[word.id].map { $0.union(word.rect) } ?? word.rect)
     }
-    var relocated: Set<RefinementWordLayout.Word.ID> = []
-    for (word, path) in zip(target, paths) {
+    var relocated: Set<Word.ID> = []
+    for word in target where !ordered.contains(word.id) {
       guard let start = sourceRects[word.id], start != word.rect else { continue }
-      if paths.contains(where: { other in
-        guard other.id != word.id else { return false }
-        let overlap = path.rect.intersection(other.rect)
+      let path = start.union(word.rect)
+      if gliding.contains(where: { other in
+        let overlap = path.intersection(other)
         return !overlap.isNull && overlap.width > 0.25 && overlap.height > 0.25
       }) { relocated.insert(word.id) }
     }
     relocatedIDs = relocated
+  }
+
+  /// Longest increasing subsequence of source positions over the target sequence. O(n log n).
+  static func readingOrderIDs(from source: [Word], to target: [Word]) -> Set<Word.ID> {
+    let sourceIndices = Dictionary(uniqueKeysWithValues: source.enumerated().map { ($0.element.id, $0.offset) })
+    let shared = target.compactMap { word in sourceIndices[word.id].map { (id: word.id, index: $0) } }
+    var tails: [Int] = []
+    var predecessors = Array(repeating: -1, count: shared.count)
+    for position in shared.indices {
+      var low = 0
+      var high = tails.count
+      while low < high {
+        let middle = (low + high) / 2
+        if shared[tails[middle]].index < shared[position].index { low = middle + 1 } else { high = middle }
+      }
+      if low > 0 { predecessors[position] = tails[low - 1] }
+      if low == tails.count { tails.append(position) } else { tails[low] = position }
+    }
+    var result: Set<Word.ID> = []
+    var position = tails.last ?? -1
+    while position >= 0 {
+      result.insert(shared[position].id)
+      position = predecessors[position]
+    }
+    return result
   }
 }
 
