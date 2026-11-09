@@ -46,15 +46,20 @@ jobs:
       SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY || secrets.SPARKLE_PUBLIC_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Validate RxLab notarization credentials
+        env:
+          APPLE_ID: ${{ secrets.RXLAB_APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.RXLAB_APPLE_ID_PWD }}
+        run: bash scripts/ci/validate-notary.sh
       - name: Validate release configuration
         env:
           SPARKLE_KEY: ${{ secrets.SPARKLE_KEY }}
         run: |
           [[ "$GITHUB_REF" == refs/tags/* && "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
           test -n "$SPARKLE_KEY" || { echo '::error::SPARKLE_KEY signing secret is required'; exit 1; }
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
       - run: brew install xcodegen
       - uses: actions/setup-python@v5
         with:
@@ -70,8 +75,10 @@ jobs:
         run: |
           python3 scripts/ci/test_sign_sparkle.py
           python3 scripts/ci/test_select_signing_identity.py
+          python3 scripts/ci/test_validate_notary.py
       - uses: apple-actions/import-codesign-certs@v3
         with:
+          keychain: finetext-release-${{ github.run_id }}-${{ github.run_attempt }}
           p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
       - name: Select Developer ID certificate for the configured team
@@ -84,8 +91,8 @@ jobs:
       - name: Package and notarize
         run: bash scripts/ci/notary.sh
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PWD: ${{ secrets.APPLE_ID_PWD }}
+          APPLE_ID: ${{ secrets.RXLAB_APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.RXLAB_APPLE_ID_PWD }}
       - name: Prepare release notes
         env:
           GH_TOKEN: ${{ github.token }}
