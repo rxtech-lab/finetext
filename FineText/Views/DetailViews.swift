@@ -12,7 +12,7 @@ struct PageHeader<Trailing: View>: View {
       Button {
         workspace.route = nil
       } label: {
-        Label("Back", systemImage: "chevron.left").labelStyle(.iconOnly).frame(width: 20, height: 20)
+        Label(LocalizableKey.back.string, systemImage: "chevron.left").labelStyle(.iconOnly).frame(width: 20, height: 20)
       }
       .buttonStyle(.borderless)
       .keyboardShortcut(.escape, modifiers: [])
@@ -40,7 +40,7 @@ struct OutputEditor: View {
       if let limit {
         Text("\(text.count)/\(limit)").font(.caption2).foregroundStyle(text.count > limit ? .red : .secondary)
       } else {
-        Text("\(text.count) characters").font(.caption2).foregroundStyle(.secondary)
+        Text(LocalizableKey.characterCount.format(text.count)).font(.caption2).foregroundStyle(.secondary)
       }
     }
   }
@@ -52,9 +52,9 @@ struct DeleteButton: View {
   @State private var confirm = false
 
   var body: some View {
-    IconButton("trash", help: "Remove") { confirm = true }
+    IconButton("trash", help: LocalizableKey.remove.string) { confirm = true }
       .confirmationDialog(title, isPresented: $confirm) {
-        Button("Remove", role: .destructive, action: action)
+        Button(LocalizableKey.remove.string, role: .destructive, action: action)
       }
   }
 }
@@ -67,7 +67,7 @@ struct ModelPickerMenu: View {
   let onPick: (ModelRef) -> Void
 
   var body: some View {
-    LabeledContent("Model") {
+    LabeledContent(LocalizableKey.model.string) {
       Menu(providers.displayName(current)) {
         ModelMenuItems(kind: kind, purpose: purpose, onPick: onPick)
       }
@@ -88,15 +88,15 @@ struct RewriteDetailView: View {
       @Bindable var item = item
       let status = workspace.status(id)
       VStack(spacing: 0) {
-        PageHeader(title: "\(item.platform.title) Rewrite") {
-          DeleteButton(title: "Remove this rewrite?") { workspace.remove(item, id: id) }
+        PageHeader(title: LocalizableKey.rewriteTitle.format(item.platformTitle)) {
+          DeleteButton(title: LocalizableKey.removeThisRewrite.string) { workspace.remove(item, id: id) }
         }
         Divider()
         VStack(alignment: .leading, spacing: 10) {
-          Picker("Tone", selection: $item.tone) {
+          Picker(LocalizableKey.tone.string, selection: $item.tone) {
             ForEach(Tone.allCases) { Text($0.title).tag($0) }
           }
-          .onChange(of: item.tone) { _, tone in preferences.setTone(tone, for: item.platform) }
+          .onChange(of: item.tone) { _, tone in preferences.setTone(tone, for: item) }
           ModelPickerMenu(kind: .text, purpose: .rewrite, current: item.model) {
             item.model = $0
             preferences.remember($0, for: .rewrite)
@@ -105,11 +105,14 @@ struct RewriteDetailView: View {
           if let note = item.note {
             Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.orange)
           }
-          OutputEditor(text: $item.output, limit: item.platform.characterLimit)
+          RefinementResultView(
+            original: item.refinementSource ?? workspace.originalText,
+            output: $item.output, status: status, limit: item.characterLimit, assessment: item
+          )
         }
         .padding(14)
         Divider()
-        ActionBar(status: status, hasOutput: !item.output.isEmpty, runTitle: item.output.isEmpty ? "Rewrite" : "Regenerate",
+        ActionBar(status: status, hasOutput: !item.output.isEmpty, runTitle: item.output.isEmpty ? LocalizableKey.rewrite.string : LocalizableKey.regenerate.string,
                   onRun: { workspace.run(item) }, onStop: { workspace.stop(id) }, onCopy: { workspace.copy(item.output) })
       }
     } else {
@@ -130,18 +133,18 @@ struct TranslationDetailView: View {
       @Bindable var item = item
       let status = workspace.status(id)
       VStack(spacing: 0) {
-        PageHeader(title: "\(item.language.name) Translation") {
-          DeleteButton(title: "Remove this translation?") { workspace.remove(item, id: id) }
+        PageHeader(title: LocalizableKey.translationTitle.format(item.language.localizedName)) {
+          DeleteButton(title: LocalizableKey.removeThisTranslation.string) { workspace.remove(item, id: id) }
         }
         Divider()
         VStack(alignment: .leading, spacing: 10) {
-          Picker("Language", selection: $item.language) {
-            ForEach(Language.all) { Text($0.name).tag($0) }
+          Picker(LocalizableKey.language.string, selection: $item.language) {
+            ForEach(Language.all) { Text($0.localizedName).tag($0) }
           }
-          Picker("From", selection: $item.sourceRewriteID) {
-            Text("Original").tag(UUID?.none)
+          Picker(LocalizableKey.from.string, selection: $item.sourceRewriteID) {
+            Text(LocalizableKey.original.string).tag(UUID?.none)
             ForEach(workspace.session.sortedRewrites) { rewrite in
-              Text("\(rewrite.platform.title) · \(rewrite.tone.title)").tag(UUID?.some(rewrite.id))
+              Text("\(rewrite.platformTitle) · \(rewrite.tone.title)").tag(UUID?.some(rewrite.id))
             }
           }
           ModelPickerMenu(kind: .text, purpose: .translate, current: item.model) {
@@ -153,7 +156,7 @@ struct TranslationDetailView: View {
         }
         .padding(14)
         Divider()
-        ActionBar(status: status, hasOutput: !item.output.isEmpty, runTitle: item.output.isEmpty ? "Translate" : "Retranslate",
+        ActionBar(status: status, hasOutput: !item.output.isEmpty, runTitle: item.output.isEmpty ? LocalizableKey.translate.string : LocalizableKey.retranslate.string,
                   onRun: { workspace.run(item) }, onStop: { workspace.stop(id) }, onCopy: { workspace.copy(item.output) })
       }
     } else {
@@ -168,14 +171,15 @@ struct ImageDetailView: View {
   @Environment(Workspace.self) private var workspace
   @Environment(Preferences.self) private var preferences
   let id: UUID
+  @State private var showRefine = false
 
   var body: some View {
     if let item = workspace.session.images.first(where: { $0.id == id }) {
       @Bindable var item = item
       let status = workspace.status(id)
       VStack(spacing: 0) {
-        PageHeader(title: "Image") {
-          DeleteButton(title: "Remove this image?") { workspace.remove(item, id: id) }
+        PageHeader(title: LocalizableKey.image.string) {
+          DeleteButton(title: LocalizableKey.removeThisImage.string) { workspace.remove(item, id: id) }
         }
         Divider()
         VStack(alignment: .leading, spacing: 10) {
@@ -183,23 +187,44 @@ struct ImageDetailView: View {
             item.model = $0
             preferences.remember($0, for: .image)
           }
-          Picker("Size", selection: $item.size) {
+          Picker(LocalizableKey.size.string, selection: $item.size) {
             ForEach(ImageSize.allCases) { Text($0.title).tag($0) }
           }
           .pickerStyle(.segmented)
-          TextField("Art direction (optional), e.g. flat illustration, warm colors", text: $item.instruction, axis: .vertical)
+          VStack(alignment: .leading, spacing: 2) {
+            Toggle(LocalizableKey.transparentBackground.string, isOn: $item.transparentBackground)
+              .toggleStyle(.switch)
+              .controlSize(.small)
+              .onChange(of: item.transparentBackground) { Haptics.tap() }
+            if item.transparentBackground {
+              Text(workspace.backgroundMode(for: item) == .native
+                   ? LocalizableKey.transparentNativeHint.string
+                   : LocalizableKey.transparentGreenScreenHint.string)
+                .font(.caption).foregroundStyle(.secondary)
+            }
+          }
+          TextField(LocalizableKey.artDirectionOptionalEGFlatIllustrationWarmColors.string, text: $item.instruction, axis: .vertical)
             .lineLimit(2...4)
             .textFieldStyle(.roundedBorder)
           StatusLine(status: status)
           ZStack {
             RoundedRectangle(cornerRadius: 10).fill(.background.secondary)
             if let data = item.imageData, let image = NSImage(data: data) {
-              Image(nsImage: image).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 8)).padding(6)
+              Image(nsImage: image).resizable().scaledToFit()
+                .background { if item.transparentBackground, BackgroundRemover.hasAlphaChannel(data) { Checkerboard() } }
+                .clipShape(RoundedRectangle(cornerRadius: 8)).padding(6)
                 .draggable(Image(nsImage: image))
+                .overlay {
+                  if status.isRunning {
+                    ProgressView().controlSize(.regular)
+                      .padding(14)
+                      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                  }
+                }
             } else if status.isRunning {
-              ProgressView("Generating…")
+              ProgressView(LocalizableKey.generating.string)
             } else {
-              Label("The image is based on your original post.", systemImage: "photo")
+              Label(LocalizableKey.theImageIsBasedOnYourOriginalPost.string, systemImage: "photo")
                 .foregroundStyle(.secondary).font(.callout)
             }
           }
@@ -210,20 +235,27 @@ struct ImageDetailView: View {
         HStack {
           if item.imageData != nil {
             Menu {
-              Button("Save to Pictures/FineText") { workspace.saveImageToPictures(item) }
-              Button("Save As…") { workspace.saveImageAs(item) }
+              Button(LocalizableKey.saveToPicturesFinetext.string) { workspace.saveImageToPictures(item) }
+              Button(LocalizableKey.saveAs.string) { workspace.saveImageAs(item) }
             } label: {
-              Label("Save", systemImage: "square.and.arrow.down")
+              Label(LocalizableKey.save.string, systemImage: "square.and.arrow.down")
             }
             .fixedSize()
-            Button { workspace.copyImage(item) } label: { Label("Copy", systemImage: "doc.on.doc") }
+            Button { workspace.copyImage(item) } label: { Label(LocalizableKey.copy.string, systemImage: "doc.on.doc") }
+            if item.canUndoRefinement, !status.isRunning {
+              IconButton("arrow.uturn.backward", help: LocalizableKey.undoRefinement.string) { workspace.undoRefinement(item) }
+            }
           }
           Spacer()
           if status.isRunning {
-            Button("Stop", role: .cancel) { workspace.stop(id) }
+            Button(LocalizableKey.stop.string, role: .cancel) { workspace.stop(id) }
           } else {
+            if item.imageData != nil {
+              Button { showRefine = true } label: { Label(LocalizableKey.refine.string, systemImage: "wand.and.stars") }
+                .keyboardShortcut("r", modifiers: .command)
+            }
             Button { workspace.run(item) } label: {
-              Label(item.imageData == nil ? "Generate" : "Regenerate", systemImage: "sparkles")
+              Label(item.imageData == nil ? LocalizableKey.generate.string : LocalizableKey.regenerate.string, systemImage: "sparkles")
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: .command)
@@ -232,8 +264,70 @@ struct ImageDetailView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
       }
+      .sheet(isPresented: $showRefine) {
+        RefineImageSheet(item: item) { instruction in workspace.refine(item, instruction: instruction) }
+      }
     } else {
       MissingItemView()
+    }
+  }
+}
+
+/// Collects a follow-up instruction for editing the current image. The edit itself runs in the detail page.
+struct RefineImageSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  let item: ImageItem
+  let onRefine: (String) -> Void
+  @State private var instruction = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(LocalizableKey.refineImage.string).font(.headline)
+      HStack(alignment: .top, spacing: 12) {
+        if let data = item.imageData, let image = NSImage(data: data) {
+          Image(nsImage: image).resizable().scaledToFit()
+            .background { if item.transparentBackground, BackgroundRemover.hasAlphaChannel(data) { Checkerboard() } }
+            .frame(width: 96, height: 96)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        Text(LocalizableKey.refineHint.string).font(.callout).foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      TextField(LocalizableKey.refinePlaceholder.string, text: $instruction, axis: .vertical)
+        .lineLimit(3...6)
+        .textFieldStyle(.roundedBorder)
+      Spacer(minLength: 0)
+      HStack {
+        Spacer()
+        Button(LocalizableKey.cancel.string, role: .cancel) { dismiss() }
+          .keyboardShortcut(.cancelAction)
+        Button {
+          onRefine(instruction)
+          dismiss()
+        } label: {
+          Label(LocalizableKey.refine.string, systemImage: "wand.and.stars")
+        }
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.return, modifiers: .command)
+        .disabled(instruction.trimmed.isEmpty)
+      }
+    }
+    .padding(16)
+    .frame(width: 380, height: 300)
+  }
+}
+
+/// Grey checkerboard shown behind transparent images.
+struct Checkerboard: View {
+  var body: some View {
+    Canvas { context, size in
+      let tile: CGFloat = 8
+      for row in 0..<Int((size.height / tile).rounded(.up)) {
+        for column in 0..<Int((size.width / tile).rounded(.up)) where (row + column).isMultiple(of: 2) {
+          context.fill(Path(CGRect(x: CGFloat(column) * tile, y: CGFloat(row) * tile, width: tile, height: tile)),
+                       with: .color(.gray.opacity(0.18)))
+        }
+      }
     }
   }
 }
@@ -248,12 +342,12 @@ struct ActionBar: View {
 
   var body: some View {
     HStack {
-      Button(action: onCopy) { Label("Copy", systemImage: "doc.on.doc") }
+      Button(action: onCopy) { Label(LocalizableKey.copy.string, systemImage: "doc.on.doc") }
         .disabled(!hasOutput)
         .keyboardShortcut("c", modifiers: [.command, .shift])
       Spacer()
       if status.isRunning {
-        Button("Stop", role: .cancel, action: onStop)
+        Button(LocalizableKey.stop.string, role: .cancel, action: onStop)
       } else {
         Button(action: onRun) { Label(runTitle, systemImage: "sparkles") }
           .buttonStyle(.borderedProminent)
@@ -268,10 +362,12 @@ struct ActionBar: View {
 struct MissingItemView: View {
   var body: some View {
     VStack(spacing: 0) {
-      PageHeader(title: "Not found") { EmptyView() }
+      PageHeader(title: LocalizableKey.notFound.string) { EmptyView() }
       Divider()
-      ContentUnavailableView("This item was removed", systemImage: "questionmark.square.dashed")
+      ContentUnavailableView(LocalizableKey.thisItemWasRemoved.string, systemImage: "questionmark.square.dashed")
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
   }
 }
 
@@ -284,11 +380,12 @@ struct HistoryView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      PageHeader(title: "History") { EmptyView() }
+      PageHeader(title: LocalizableKey.history.string) { EmptyView() }
       Divider()
       let visible = sessions.filter { !$0.isEmpty }
       if visible.isEmpty {
-        ContentUnavailableView("No sessions yet", systemImage: "clock", description: Text("Your refinements are saved here automatically."))
+        ContentUnavailableView(LocalizableKey.noSessionsYet.string, systemImage: "clock", description: Text(LocalizableKey.yourRefinementsAreSavedHereAutomatically.string))
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         List(visible) { session in
           Button {
@@ -298,11 +395,11 @@ struct HistoryView: View {
               HStack {
                 Text(session.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                 if session.id == workspace.session.id {
-                  Text("Current").font(.caption2.weight(.semibold)).padding(.horizontal, 6).padding(.vertical, 1)
+                  Text(LocalizableKey.current.string).font(.caption2.weight(.semibold)).padding(.horizontal, 6).padding(.vertical, 1)
                     .background(.tint.opacity(0.2), in: Capsule())
                 }
               }
-              Text("\(session.rewrites.count) rewrites · \(session.translations.count) translations · \(session.images.count) images")
+              Text(LocalizableKey.sessionCounts.format(session.rewrites.count, session.translations.count, session.images.count))
                 .font(.caption).foregroundStyle(.secondary)
               Text(session.updatedAt, format: .relative(presentation: .named))
                 .font(.caption2).foregroundStyle(.tertiary)
@@ -312,22 +409,23 @@ struct HistoryView: View {
           }
           .buttonStyle(.plain)
           .contextMenu {
-            Button("Delete", role: .destructive) { pendingDelete = session }
+            Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session }
           }
           .swipeActions {
-            Button("Delete", role: .destructive) { pendingDelete = session }
+            Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session }
           }
         }
         .listStyle(.inset)
       }
     }
-    .confirmationDialog("Delete this session?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
-      Button("Delete", role: .destructive) {
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .confirmationDialog(LocalizableKey.deleteThisSession.string, isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
+      Button(LocalizableKey.delete.string, role: .destructive) {
         if let pendingDelete { workspace.deleteSession(pendingDelete) }
         pendingDelete = nil
       }
     } message: {
-      Text("Its text, rewrites, translations and images are removed permanently.")
+      Text(LocalizableKey.itsTextRewritesTranslationsAndImagesAreRemovedPermanently.string)
     }
   }
 }

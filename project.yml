@@ -1,12 +1,31 @@
 name: FineText
 options:
+  developmentLanguage: en
   bundleIdPrefix: app.rxlab
   deploymentTarget:
-    macOS: '15.0'
+    macOS: '26.0'
 packages:
+  ONNXRuntime:
+    url: https://github.com/microsoft/onnxruntime-swift-package-manager
+    exactVersion: 1.24.2
+  RxAgentSDK:
+    url: https://github.com/rxtech-lab/RxAgentSDK
+    revision: 5f2eba0a2f55d1a4181f4a82a6046f3a8445310a
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.10.1
+  MLXSwiftLM:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    exactVersion: 3.32.3
+  MLXSwift:
+    url: https://github.com/ml-explore/mlx-swift
+    minorVersion: 0.32.3
+  SwiftHuggingFace:
+    url: https://github.com/huggingface/swift-huggingface
+    from: 0.9.0
+  SwiftTransformers:
+    url: https://github.com/huggingface/swift-transformers
+    from: 1.3.0
 settings:
   base:
     SWIFT_VERSION: '6.0'
@@ -18,6 +37,7 @@ settings:
     DEVELOPMENT_TEAM: P9KK452K8P
     INFOPLIST_KEY_CFBundleDisplayName: FineText
     INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+    ARCHS: arm64
 configFiles:
   Debug: Configuration/Debug.xcconfig
   Release: Configuration/Release.xcconfig
@@ -27,8 +47,28 @@ targets:
     platform: macOS
     sources:
       - path: FineText
+        excludes:
+          - "**/__pycache__"
+          - "**/*.pyc"
+      - path: AppIcon.icon
+        buildPhase: resources
     dependencies:
+      - package: ONNXRuntime
+        product: onnxruntime
+      - package: RxAgentSDK
       - package: Sparkle
+      - package: MLXSwiftLM
+        product: MLXLLM
+      - package: MLXSwiftLM
+        product: MLXLMCommon
+      - package: MLXSwift
+        product: MLX
+      - package: SwiftHuggingFace
+        product: HuggingFace
+      - package: SwiftTransformers
+        product: Hub
+      - package: SwiftTransformers
+        product: Tokenizers
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.rxlab.finetext

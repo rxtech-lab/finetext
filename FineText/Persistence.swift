@@ -22,19 +22,31 @@ import SwiftData
 
   var title: String {
     let line = originalText.trimmed.components(separatedBy: .newlines).first ?? ""
-    return line.isEmpty ? "Untitled session" : String(line.prefix(80))
+    return line.isEmpty ? LocalizableKey.untitledSession.string : String(line.prefix(80))
   }
 }
 
 @Model final class RewriteItem {
   var id = UUID()
   var createdAt = Date.now
+  // Snapshots preserve history and regeneration after a preset is edited or deleted.
+  var customPlatformID: UUID?
+  var customPlatformName: String?
+  var customPlatformInstruction: String?
   var platformRaw = Platform.x.rawValue
   var toneRaw = Tone.casual.rawValue
   var providerID = UUID()
   var modelID = ""
   var output = ""
+  /// The actual input used for this rewrite, even if the session draft changes later.
+  var refinementSource: String?
   var note: String?
+  var initialAIScore: Double?
+  var finalAIScore: Double?
+  var targetAIScore: Double?
+  var detectorEngineRaw: String?
+  var aiScoredText: String?
+  var humanizationRounds = 0
   var session: RefinementSession?
 
   init(platform: Platform, tone: Tone, model: ModelRef) {
@@ -43,6 +55,11 @@ import SwiftData
     providerID = model.providerID
     modelID = model.modelID
   }
+
+  var isCustomPlatform: Bool { customPlatformID != nil }
+  var platformTitle: String { customPlatformName ?? platform.title }
+  var platformSymbol: String { isCustomPlatform ? "slider.horizontal.3" : platform.symbol }
+  var characterLimit: Int? { isCustomPlatform ? nil : platform.characterLimit }
 
   var platform: Platform { Platform(rawValue: platformRaw) ?? .x }
   var tone: Tone {
@@ -91,6 +108,13 @@ import SwiftData
   var instruction = ""
   var sizeRaw = ImageSize.square.rawValue
   @Attribute(.externalStorage) var imageData: Data?
+  /// Ask for a cut-out subject on a transparent background.
+  var transparentBackground = false
+  /// The unkeyed green-screen render behind `imageData`, kept so refinements edit the original pixels.
+  @Attribute(.externalStorage) var rawImageData: Data?
+  /// The image before the last refinement, for one-step undo.
+  @Attribute(.externalStorage) var previousImageData: Data?
+  @Attribute(.externalStorage) var previousRawImageData: Data?
   var session: RefinementSession?
 
   init(model: ModelRef) {
@@ -106,6 +130,7 @@ import SwiftData
     get { ModelRef(providerID: providerID, modelID: modelID) }
     set { providerID = newValue.providerID; modelID = newValue.modelID }
   }
+  var canUndoRefinement: Bool { previousImageData != nil }
 }
 
 enum Persistence {

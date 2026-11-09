@@ -1,82 +1,110 @@
 import Foundation
+import HuggingFace
+import MLX
+import MLXLLM
+import MLXLMCommon
 import NaturalLanguage
+import Tokenizers
 
-/// TranslateGemma runs as an external component through a local Ollama server.
-/// FineText never bundles the weights; the user downloads them from Settings.
-struct TranslateGemmaClient: Sendable {
-  let baseURL: URL
-  let model: String
+/// Translation checkpoints supported by the humanizer.
+struct TranslationModel: Hashable, Identifiable, Sendable {
+  let id: String
+  let name: String
+  let size: String
 
-  static let availableModels = ["translategemma:4b", "translategemma:12b", "translategemma:27b"]
-  static let ollamaDownloadURL = URL(string: "https://ollama.com/download")!
+  var isNLLB: Bool { id.hasPrefix("Xenova/nllb-") }
 
-  static func fromDefaults() throws -> TranslateGemmaClient {
-    let defaults = UserDefaults.standard
-    var string = (defaults.string(forKey: DefaultsKey.ollamaURL) ?? "http://localhost:11434").trimmed
-    while string.hasSuffix("/") { string.removeLast() }
-    guard let url = URL(string: string) else { throw APIError.invalidURL }
-    return TranslateGemmaClient(baseURL: url, model: (defaults.string(forKey: DefaultsKey.gemmaModel) ?? availableModels[0]).trimmed)
+  static let all = [
+    TranslationModel(id: "mlx-community/translategemma-4b-it-4bit", name: "TranslateGemma 4B", size: "≈ 3 GB"),
+    TranslationModel(id: "mlx-community/translategemma-12b-it-4bit", name: "TranslateGemma 12B", size: "≈ 8 GB"),
+    TranslationModel(id: "mlx-community/translategemma-27b-it-4bit", name: "TranslateGemma 27B", size: "≈ 16 GB"),
+    TranslationModel(id: NLLB.repository, name: "Meta NLLB-200 600M", size: "≈ 1.34 GB"),
+  ]
+  static let `default` = all[0]
+
+  static func named(_ id: String?) -> TranslationModel {
+    all.first { $0.id == id } ?? .default
   }
 
-  private func request(_ path: String, method: String = "GET", body: [String: Any]? = nil, timeout: TimeInterval = 600) throws -> URLRequest {
-    var request = URLRequest(url: baseURL.appending(path: path), timeoutInterval: timeout)
-    request.httpMethod = method
-    if let body {
-      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-      request.httpBody = try JSONSerialization.data(withJSONObject: body)
-    }
-    return request
+  static func fromDefaults() -> TranslationModel {
+    named(UserDefaults.standard.string(forKey: DefaultsKey.gemmaModel))
+  }
+}
+
+enum TranslateGemmaError: LocalizedError {
+  case empty
+
+  var errorDescription: String? { LocalizableKey.translategemmaReturnedNoText.string }
+}
+
+/// Routes translation to MLX TranslateGemma or the local Meta NLLB runtime.
+/// The weights are not bundled; they are downloaded from Hugging Face from Settings.
+actor TranslationEngine {
+  static let shared = TranslationEngine()
+
+  /// Unload the weights after this long without a translation to give the memory back.
+  private static let idleUnloadDelay: Duration = .seconds(300)
+
+  private var loaded: (id: String, container: ModelContainer)?
+  private var idleTask: Task<Void, Never>?
+
+  // MARK: Download management
+
+  /// The local snapshot folder when every file of the model is on disk, otherwise nil.
+  func localSnapshot(_ model: TranslationModel) async -> URL? {
+    if model.isNLLB { return await NLLB.shared.localSnapshot(model.id) }
+    return await MLXHub.localSnapshot(model.id)
   }
 
-  private func matches(_ name: String) -> Bool {
-    name == model || name == model + ":latest" || (model.hasSuffix(":latest") && name == String(model.dropLast(7)))
+  func isInstalled(_ model: TranslationModel) async -> Bool {
+    await localSnapshot(model) != nil
   }
 
-  // MARK: Status
-
-  func isInstalled() async throws -> Bool {
-    let (data, response) = try await URLSession.shared.data(for: request("api/tags", timeout: 5))
-    if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-      throw APIError.http(http.statusCode, OpenAIClient.errorMessage(from: data))
-    }
-    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-    let names = ((json?["models"] as? [[String: Any]]) ?? []).compactMap { $0["name"] as? String }
-    return names.contains(where: matches)
-  }
-
-  struct PullProgress: Sendable {
-    let status: String
-    let fraction: Double?
-  }
-
-  func pull(progress: @MainActor @Sendable (PullProgress) -> Void) async throws {
-    let (bytes, response) = try await URLSession.shared.bytes(for: request("api/pull", method: "POST", body: ["model": model, "stream": true], timeout: 3600))
-    if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-      throw APIError.http(http.statusCode, "Ollama could not start the download")
-    }
-    for try await line in bytes.lines {
-      try Task.checkCancellation()
-      guard let json = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { continue }
-      if let error = json["error"] as? String { throw APIError.http(500, error) }
-      let status = (json["status"] as? String) ?? ""
-      var fraction: Double?
-      if let total = (json["total"] as? NSNumber)?.doubleValue, total > 0 {
-        fraction = ((json["completed"] as? NSNumber)?.doubleValue ?? 0) / total
-      }
-      await progress(PullProgress(status: status, fraction: fraction))
+  func download(_ model: TranslationModel, progress: @MainActor @Sendable @escaping (Int64, Int64) -> Void) async throws {
+    if model.isNLLB {
+      try await NLLB.shared.download(model.id, progress: progress)
+    } else {
+      try await MLXHub.download(model.id, progress: progress)
     }
   }
 
-  func remove() async throws {
-    let (data, response) = try await URLSession.shared.data(for: request("api/delete", method: "DELETE", body: ["model": model], timeout: 30))
-    if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-      throw APIError.http(http.statusCode, OpenAIClient.errorMessage(from: data))
+  func remove(_ model: TranslationModel) async throws {
+    if model.isNLLB { try await NLLB.shared.remove(model.id); return }
+    if loaded?.id == model.id { unload() }
+    try MLXHub.remove(model.id)
+  }
+
+  // MARK: Model lifetime
+
+  private func container(for model: TranslationModel) async throws -> ModelContainer {
+    if let loaded, loaded.id == model.id { return loaded.container }
+    unload()
+    guard let folder = await localSnapshot(model) else { throw MLXHubError.notDownloaded }
+    let configuration = ModelConfiguration(directory: folder, extraEOSTokens: ["<end_of_turn>"])
+    let container = try await MLXHub.load(configuration)
+    loaded = (model.id, container)
+    return container
+  }
+
+  private func unload() {
+    idleTask?.cancel()
+    idleTask = nil
+    loaded = nil
+    Memory.clearCache()
+  }
+
+  private func scheduleIdleUnload() {
+    idleTask?.cancel()
+    idleTask = Task { [weak self] in
+      try? await Task.sleep(for: Self.idleUnloadDelay)
+      guard !Task.isCancelled else { return }
+      await self?.unload()
     }
   }
 
   // MARK: Translation
 
-  /// TranslateGemma's recommended prompt format.
+  /// TranslateGemma's prompt, identical to what its chat template renders for a text request.
   static func prompt(_ text: String, from source: Language, to target: Language) -> String {
     """
     You are a professional \(source.name) (\(source.code)) to \(target.name) (\(target.code)) translator. \
@@ -86,42 +114,55 @@ struct TranslateGemmaClient: Sendable {
     Please translate the following \(source.name) text into \(target.name):
 
 
-    \(text)
+    \(text.trimmed)
     """
   }
 
-  func translate(_ text: String, from source: Language, to target: Language) async throws -> String {
+  func translate(_ text: String, from source: Language, to target: Language, model: TranslationModel) async throws -> String {
+    idleTask?.cancel()
+    defer { scheduleIdleUnload() }
+    let container = try await container(for: model)
     var output: [String] = []
     for chunk in Self.chunks(of: text) {
       try Task.checkCancellation()
       if chunk.trimmed.isEmpty { output.append(chunk); continue }
-      let body: [String: Any] = [
-        "model": model,
-        "stream": false,
-        "messages": [["role": "user", "content": Self.prompt(chunk, from: source, to: target)]],
-      ]
-      let (data, response) = try await URLSession.shared.data(for: request("api/chat", method: "POST", body: body))
-      if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-        throw APIError.http(http.statusCode, OpenAIClient.errorMessage(from: data))
-      }
-      let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-      guard let content = (json?["message"] as? [String: Any])?["content"] as? String, !content.trimmed.isEmpty else {
-        throw APIError.empty
-      }
-      output.append(content.trimmed)
+      let translated = try await generate(Self.prompt(chunk, from: source, to: target), with: container)
+      guard !translated.isEmpty else { throw TranslateGemmaError.empty }
+      output.append(translated)
     }
     return output.joined(separator: "\n\n")
   }
 
+  private func generate(_ prompt: String, with container: ModelContainer) async throws -> String {
+    // The chat template expects structured content; render its Gemma turn format directly.
+    // The tokenizer adds <bos>.
+    let rendered = "<start_of_turn>user\n\(prompt)<end_of_turn>\n<start_of_turn>model\n"
+    let tokens = await container.encode(rendered)
+    let parameters = GenerateParameters(maxTokens: 2048, temperature: 0.7, topP: 0.95, topK: 64)
+    let stream = try await container.generate(input: LMInput(tokens: MLXArray(tokens)), parameters: parameters)
+    var result = ""
+    for await event in stream {
+      try Task.checkCancellation()
+      if case .chunk(let text) = event { result += text }
+    }
+    return result.replacingOccurrences(of: "<end_of_turn>", with: "").trimmed
+  }
+
   /// Round-trips text through a pivot language to break up LLM phrasing patterns.
-  func humanize(_ text: String, rounds: Int, pivot preferred: Language, progress: @MainActor @Sendable (Int) -> Void) async throws -> String {
+  func humanize(
+    _ text: String, rounds: Int, pivot preferred: Language, model: TranslationModel,
+    progress: @MainActor @Sendable @escaping (Int) -> Void
+  ) async throws -> String {
+    if model.isNLLB {
+      return try await NLLB.shared.humanize(text, rounds: rounds, pivot: preferred, model: model, progress: progress)
+    }
     let source = Self.detectLanguage(text)
     let pivot = source.code == preferred.code ? (source.code == "en" ? Language.japanese : .english) : preferred
     var current = text
     for round in 1...max(rounds, 1) {
       await progress(round)
-      let intermediate = try await translate(current, from: source, to: pivot)
-      current = try await translate(intermediate, from: pivot, to: source)
+      let intermediate = try await translate(current, from: source, to: pivot, model: model)
+      current = try await translate(intermediate, from: pivot, to: source, model: model)
     }
     return current
   }
@@ -133,7 +174,7 @@ struct TranslateGemmaClient: Sendable {
     return Language.named(code: language.rawValue)
   }
 
-  /// TranslateGemma has a small context window; translate long posts paragraph group by group.
+  /// TranslateGemma was trained on short inputs; translate long posts paragraph group by group.
   static func chunks(of text: String, limit: Int = 1500) -> [String] {
     let paragraphs = text.components(separatedBy: "\n\n")
     var result: [String] = []
@@ -151,68 +192,163 @@ struct TranslateGemmaClient: Sendable {
   }
 }
 
-/// Settings-side state for the external TranslateGemma component.
-@MainActor @Observable final class TranslateGemmaManager {
+// MARK: - MLX bridges
+
+/// Models are always loaded from a local snapshot folder; downloads go through `TranslateGemma.download`.
+struct LocalOnlyDownloader: MLXLMCommon.Downloader {
+  func download(
+    id: String, revision: String?, matching patterns: [String], useLatest: Bool,
+    progressHandler: @Sendable @escaping (Progress) -> Void
+  ) async throws -> URL {
+    throw MLXHubError.notDownloaded
+  }
+}
+
+/// Loads the tokenizer with swift-transformers.
+struct TransformersTokenizerLoader: MLXLMCommon.TokenizerLoader {
+  func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
+    TokenizerBridge(try await AutoTokenizer.from(modelFolder: directory))
+  }
+}
+
+private struct TokenizerBridge: MLXLMCommon.Tokenizer {
+  let upstream: any Tokenizers.Tokenizer
+
+  init(_ upstream: any Tokenizers.Tokenizer) { self.upstream = upstream }
+
+  func encode(text: String, addSpecialTokens: Bool) -> [Int] {
+    upstream.encode(text: text, addSpecialTokens: addSpecialTokens)
+  }
+
+  func decode(tokenIds: [Int], skipSpecialTokens: Bool) -> String {
+    upstream.decode(tokens: tokenIds, skipSpecialTokens: skipSpecialTokens)
+  }
+
+  func convertTokenToId(_ token: String) -> Int? { upstream.convertTokenToId(token) }
+  func convertIdToToken(_ id: Int) -> String? { upstream.convertIdToToken(id) }
+
+  var bosToken: String? { upstream.bosToken }
+  var eosToken: String? { upstream.eosToken }
+  var unknownToken: String? { upstream.unknownToken }
+
+  func applyChatTemplate(
+    messages: [[String: any Sendable]], tools: [[String: any Sendable]]?, additionalContext: [String: any Sendable]?
+  ) throws -> [Int] {
+    do {
+      return try upstream.applyChatTemplate(messages: messages, tools: tools, additionalContext: additionalContext)
+    } catch Tokenizers.TokenizerError.missingChatTemplate {
+      throw MLXLMCommon.TokenizerError.missingChatTemplate
+    }
+  }
+}
+
+// MARK: - Settings state
+
+/// Settings-side state for the selected downloadable translation model.
+@MainActor @Observable final class TranslationModelManager {
   enum State: Equatable {
-    case unknown, checking, serverUnavailable(String), notInstalled, installed
-    case downloading(String, Double?)
+    case unknown, checking, notInstalled, installed
+    case downloading(DownloadProgress)
     case failed(String)
   }
 
   var state: State = .unknown
+  private(set) var isRemoving = false
+  private(set) var toast: Toast?
   private var task: Task<Void, Never>?
+  private var downloadID: UUID?
+  private(set) var downloadingModel: TranslationModel?
 
   var isDownloading: Bool { if case .downloading = state { true } else { false } }
 
   func refresh() {
-    guard !isDownloading else { return }
+    guard !isDownloading, !isRemoving else { return }
     state = .checking
+    let model = TranslationModel.fromDefaults()
     Task {
-      do {
-        let installed = try await TranslateGemmaClient.fromDefaults().isInstalled()
-        state = installed ? .installed : .notInstalled
-      } catch {
-        state = .serverUnavailable(error.localizedDescription)
-      }
+      let installed = await TranslationEngine.shared.isInstalled(model)
+      guard state == .checking, model == TranslationModel.fromDefaults() else { return }
+      state = installed ? .installed : .notInstalled
     }
   }
 
   func download() {
-    task?.cancel()
-    state = .downloading("Starting…", nil)
+    guard !isDownloading, !isRemoving else { return }
+    let downloadID = UUID()
+    self.downloadID = downloadID
+    state = .downloading(DownloadProgress())
+    let model = TranslationModel.fromDefaults()
+    downloadingModel = model
     task = Task {
-      do {
-        try await TranslateGemmaClient.fromDefaults().pull { [weak self] progress in
-          self?.state = .downloading(progress.status.isEmpty ? "Downloading…" : progress.status.capitalized, progress.fraction)
+      defer {
+        if self.downloadID == downloadID {
+          self.downloadID = nil
+          downloadingModel = nil
+          task = nil
         }
+      }
+      do {
+        try await TranslationEngine.shared.download(model) { completed, total in
+          guard self.downloadID == downloadID else { return }
+          self.update(completed: completed, total: total)
+        }
+        try Task.checkCancellation()
+        guard self.downloadID == downloadID else { return }
         state = .installed
-        refresh()
+        Haptics.success()
       } catch is CancellationError {
-        state = .notInstalled
+        if self.downloadID == downloadID { state = .notInstalled }
       } catch let error as URLError where error.code == .cancelled {
-        state = .notInstalled
+        if self.downloadID == downloadID { state = .notInstalled }
       } catch {
-        state = .failed(error.localizedDescription)
+        if self.downloadID == downloadID {
+          state = .failed(error.localizedDescription)
+          Haptics.failure()
+        }
       }
     }
+  }
+
+  private func update(completed: Int64, total: Int64) {
+    guard case .downloading(var progress) = state else { return }
+    progress.update(completed: completed, total: total)
+    state = .downloading(progress)
   }
 
   func cancel() {
     task?.cancel()
     task = nil
+    downloadID = nil
+    downloadingModel = nil
     state = .notInstalled
   }
 
   func remove() {
+    guard !isDownloading, !isRemoving else { return }
+    isRemoving = true
     state = .checking
+    let model = TranslationModel.fromDefaults()
     Task {
       do {
-        try await TranslateGemmaClient.fromDefaults().remove()
+        try await TranslationEngine.shared.remove(model)
+        isRemoving = false
+        Haptics.success()
+        show(Toast(message: LocalizableKey.removedModel.format(model.name), symbol: "trash"))
+        refresh()
       } catch {
+        isRemoving = false
         state = .failed(error.localizedDescription)
-        return
+        Haptics.failure()
+        show(Toast(message: error.localizedDescription, symbol: "exclamationmark.triangle", isError: true))
       }
-      refresh()
+    }
+  }
+
+  private func show(_ value: Toast) {
+    toast = value
+    Task {
+      try? await Task.sleep(for: .seconds(4))
+      if toast?.id == value.id { toast = nil }
     }
   }
 }

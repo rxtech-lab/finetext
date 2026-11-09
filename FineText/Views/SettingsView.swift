@@ -1,13 +1,21 @@
 import SwiftUI
 
+enum SettingsTab: String {
+  case general, providers, local, humanizer
+}
+
 struct SettingsView: View {
+  @AppStorage(DefaultsKey.settingsTab) private var tab = SettingsTab.general
+
   var body: some View {
-    TabView {
-      Tab("General", systemImage: "gearshape") { GeneralSettingsView() }
-      Tab("Providers", systemImage: "server.rack") { ProvidersSettingsView() }
-      Tab("Humanizer", systemImage: "character.bubble") { HumanizerSettingsView() }
+    TabView(selection: $tab) {
+      Tab(LocalizableKey.general.string, systemImage: "gearshape", value: .general) { GeneralSettingsView() }
+      Tab(LocalizableKey.providers.string, systemImage: "server.rack", value: .providers) { ProvidersSettingsView() }
+      Tab(LocalizableKey.localModels.string, systemImage: "cpu", value: .local) { LocalModelsSettingsView() }
+      Tab(LocalizableKey.humanizer.string, systemImage: "character.bubble", value: .humanizer) { HumanizerSettingsView() }
     }
     .frame(width: 580, height: 460)
+    .modelDownloadOverlay()
   }
 }
 
@@ -16,19 +24,20 @@ struct SettingsView: View {
 struct GeneralSettingsView: View {
   @Environment(AppUpdater.self) private var updater
   @Environment(Preferences.self) private var preferences
+  @State private var showClaudeCode = false
 
   var body: some View {
     @Bindable var updater = updater
     Form {
-      Section("Default tone per platform") {
+      Section(LocalizableKey.defaultTonePerPlatform.string) {
         ForEach(Platform.allCases) { platform in
           Picker(platform.title, selection: Binding(get: { preferences.tone(for: platform) }, set: { preferences.setTone($0, for: platform) })) {
             ForEach(Tone.allCases) { Text($0.title).tag($0) }
           }
         }
       }
-      Section("Images") {
-        LabeledContent("Quick save folder") {
+      Section(LocalizableKey.images.string) {
+        LabeledContent(LocalizableKey.quickSaveFolder.string) {
           Button("~/Pictures/FineText") {
             try? FileManager.default.createDirectory(at: Workspace.picturesFolder, withIntermediateDirectories: true)
             NSWorkspace.shared.open(Workspace.picturesFolder)
@@ -36,18 +45,114 @@ struct GeneralSettingsView: View {
           .buttonStyle(.link)
         }
       }
-      Section("Updates") {
-        Toggle("Automatically check for updates", isOn: $updater.automaticallyChecks)
+      CodexSettingsSection()
+      Section {
+        Button("Claude Code") { showClaudeCode = true }
+      }
+      Section(LocalizableKey.updates.string) {
+        Toggle(LocalizableKey.automaticallyCheckForUpdates.string, isOn: $updater.automaticallyChecks)
           .disabled(!updater.isConfigured)
-        LabeledContent("Version", value: AppUpdater.versionString)
-        Button("Check for Updates…") { updater.checkForUpdates() }
+        LabeledContent(LocalizableKey.version.string, value: AppUpdater.versionString)
+        Button(LocalizableKey.checkForUpdates.string) { updater.checkForUpdates() }
           .disabled(!updater.isConfigured)
         if !updater.isConfigured {
-          Text("Updates are available in release builds only.").font(.caption).foregroundStyle(.secondary)
+          Text(LocalizableKey.updatesAreAvailableInReleaseBuildsOnly.string).font(.caption).foregroundStyle(.secondary)
         }
       }
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $showClaudeCode) { ClaudeCodeSetupSheet() }
+  }
+}
+
+struct ClaudeCodeSetupSheet: View {
+  @Environment(ProviderStore.self) private var store
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Form {
+        Section {
+          LabeledContent(LocalizableKey.status.string) {
+            if let install = store.claudeCode {
+              Label(LocalizableKey.installedVersion.format(install.version), systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            } else {
+              Label(LocalizableKey.notFound.string, systemImage: "xmark.circle").foregroundStyle(.secondary)
+            }
+          }
+          if let install = store.claudeCode {
+            LabeledContent(LocalizableKey.location.string) {
+              Text(install.executable.path).font(.caption.monospaced()).textSelection(.enabled)
+                .lineLimit(1).truncationMode(.middle)
+            }
+          }
+        } header: {
+          Text("Claude Code")
+        } footer: {
+          Text(LocalizableKey.claudeCodeSetup.string).font(.caption).foregroundStyle(.secondary)
+        }
+      }
+      .formStyle(.grouped)
+      Divider()
+      HStack {
+        Button(LocalizableKey.detectAgain.string) {
+          Haptics.tap()
+          Task { await store.detectClaudeCode() }
+        }
+        .disabled(store.detectingClaudeCode)
+        Spacer()
+        Button(LocalizableKey.done.string) { dismiss() }.keyboardShortcut(.defaultAction)
+      }
+      .padding(12)
+    }
+    .frame(width: 480)
+    .frame(minHeight: 320, maxHeight: .infinity)
+    .overlay {
+      if store.detectingClaudeCode {
+        ZStack {
+          Rectangle().fill(.regularMaterial)
+          ProgressView(LocalizableKey.checking.string)
+        }
+      }
+    }
+  }
+}
+
+// MARK: - Codex
+
+struct CodexSettingsSection: View {
+  @Environment(ProviderStore.self) private var store
+
+  var body: some View {
+    Section {
+      LabeledContent(LocalizableKey.status.string) {
+        if store.detectingCodex {
+          ProgressView().controlSize(.small)
+        } else if let codex = store.codex {
+          Label(LocalizableKey.installedVersion.format(codex.version), systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        } else {
+          Label(LocalizableKey.notFound.string, systemImage: "xmark.circle").foregroundStyle(.secondary)
+        }
+      }
+      if let codex = store.codex {
+        LabeledContent(LocalizableKey.location.string) {
+          Text(codex.executable.path).font(.caption.monospaced()).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
+        }
+      }
+      Button(LocalizableKey.detectAgain.string) {
+        Haptics.tap()
+        Task { await store.detectCodex() }
+      }
+      .disabled(store.detectingCodex)
+    } header: {
+      Text("Codex")
+    } footer: {
+      Text(store.codex == nil
+        ? LocalizableKey.installTheCodexCliToRewriteAndGenerateImagesWithYourChatgptPlan.string
+        : LocalizableKey.chooseCodexToRewriteTranslateAndGenerateImagesWithYourCodexSignIn.string)
+        .font(.caption).foregroundStyle(.secondary)
+    }
   }
 }
 
@@ -63,22 +168,23 @@ struct ProvidersSettingsView: View {
     VStack(spacing: 0) {
       if store.providers.isEmpty {
         ContentUnavailableView {
-          Label("No providers", systemImage: "server.rack")
+          Label(LocalizableKey.noProviders.string, systemImage: "server.rack")
         } description: {
-          Text("Add an OpenAI-compatible endpoint with its URL and API key to start rewriting.")
+          Text(LocalizableKey.addAnOpenaiCompatibleEndpointWithItsUrlAndApiKeyToStartRewriting.string)
         } actions: {
-          Button("Add Provider…") { editing = ProviderDraft() }.buttonStyle(.borderedProminent)
+          Button(LocalizableKey.addProvider.string) { editing = ProviderDraft() }.buttonStyle(.borderedProminent)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
         List(selection: $selection) {
           ForEach(store.providers) { provider in
             ProviderRow(provider: provider)
               .tag(provider.id)
               .contextMenu {
-                Button("Edit…") { edit(provider) }
-                Button("Refresh Models") { Task { await store.refresh(provider.id) } }
+                Button(LocalizableKey.edit.string) { edit(provider) }
+                Button(LocalizableKey.refreshModels.string) { Task { await store.refresh(provider.id) } }
                 Divider()
-                Button("Delete", role: .destructive) { pendingDelete = provider }
+                Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = provider }
               }
           }
         }
@@ -90,32 +196,33 @@ struct ProvidersSettingsView: View {
       Divider()
       HStack(spacing: 6) {
         Button { editing = ProviderDraft() } label: { Image(systemName: "plus") }
-          .help("Add provider")
+          .help(LocalizableKey.addProviderHelp.string)
         Button {
           pendingDelete = selection.flatMap(store.provider)
         } label: { Image(systemName: "minus") }
           .disabled(selection == nil)
-          .help("Delete provider")
+          .help(LocalizableKey.deleteProvider.string)
         Spacer()
-        Button("Edit…") { if let provider = selection.flatMap(store.provider) { edit(provider) } }
+        Button(LocalizableKey.edit.string) { if let provider = selection.flatMap(store.provider) { edit(provider) } }
           .disabled(selection == nil)
-        Button("Refresh All") { Task { await store.refreshAll() } }
+        Button(LocalizableKey.refreshAll.string) { Task { await store.refreshAll() } }
           .disabled(store.providers.isEmpty)
       }
       .buttonStyle(.borderless)
       .padding(8)
     }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
     .sheet(item: $editing) { draft in
       ProviderEditorSheet(draft: draft)
     }
-    .confirmationDialog("Delete \(pendingDelete?.name ?? "provider")?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
-      Button("Delete", role: .destructive) {
+    .confirmationDialog(LocalizableKey.deleteProviderConfirmation.format(pendingDelete?.name ?? LocalizableKey.provider.string), isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
+      Button(LocalizableKey.delete.string, role: .destructive) {
         if let pendingDelete { store.delete(pendingDelete) }
         selection = nil
         pendingDelete = nil
       }
     } message: {
-      Text("Its API key is removed from the Keychain.")
+      Text(LocalizableKey.itsApiKeyIsRemovedFromTheKeychain.string)
     }
   }
 
@@ -142,8 +249,8 @@ struct ProviderRow: View {
         ProgressView().controlSize(.small)
       } else {
         VStack(alignment: .trailing, spacing: 2) {
-          Text("\(store.models(for: provider.id, kind: .text).count) text").font(.caption)
-          Text("\(store.models(for: provider.id, kind: .image).count) image").font(.caption)
+          Text(LocalizableKey.textModelCount.format(store.models(for: provider.id, kind: .text).count)).font(.caption)
+          Text(LocalizableKey.imageModelCount.format(store.models(for: provider.id, kind: .image).count)).font(.caption)
         }
         .foregroundStyle(.secondary)
       }
@@ -183,32 +290,32 @@ struct ProviderEditorSheet: View {
       Form {
         Section {
           if draft.isNew {
-            Picker("Preset", selection: Binding(get: { "" }, set: { name in
+            Picker(LocalizableKey.preset.string, selection: Binding(get: { "" }, set: { name in
               if let preset = ProviderStore.presets.first(where: { $0.name == name }) {
                 draft.provider.name = preset.name
                 draft.provider.baseURL = preset.baseURL
               }
             })) {
-              Text("Custom").tag("")
+              Text(LocalizableKey.custom.string).tag("")
               ForEach(ProviderStore.presets, id: \.name) { Text($0.name).tag($0.name) }
             }
           }
-          TextField("Name", text: $draft.provider.name, prompt: Text("My Provider"))
-          TextField("Base URL", text: $draft.provider.baseURL, prompt: Text("https://api.openai.com/v1"))
-          SecureField("API Key", text: $draft.apiKey, prompt: Text("sk-…  (leave empty for local servers)"))
+          TextField(LocalizableKey.name.string, text: $draft.provider.name, prompt: Text(LocalizableKey.myProvider.string))
+          TextField(LocalizableKey.baseUrl.string, text: $draft.provider.baseURL, prompt: Text("https://api.openai.com/v1"))
+          SecureField(LocalizableKey.apiKey.string, text: $draft.apiKey, prompt: Text(LocalizableKey.skLeaveEmptyForLocalServers.string))
         } footer: {
-          Text("Any OpenAI-compatible endpoint. Models are listed from GET /models and filtered by capability; the key is stored in your Keychain.")
+          Text(LocalizableKey.anyOpenaiCompatibleEndpointModelsAreListedFromGetModelsAndFilteredByCapabilityTheKeyIsStoredInYourKeychain.string)
             .font(.caption).foregroundStyle(.secondary)
         }
         Section {
           HStack {
-            Button("Test Connection", action: test).disabled(!isValid || testState == .testing)
+            Button(LocalizableKey.testConnection.string, action: test).disabled(!isValid || testState == .testing)
             Spacer()
             switch testState {
             case .idle: EmptyView()
             case .testing: ProgressView().controlSize(.small)
             case .success(let text, let image):
-              Label("\(text) text · \(image) image models", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+              Label(LocalizableKey.modelCounts.format(text, image), systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             case .failure(let message):
               Label(message, systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(2)
             }
@@ -219,8 +326,8 @@ struct ProviderEditorSheet: View {
       Divider()
       HStack {
         Spacer()
-        Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
-        Button(draft.isNew ? "Add" : "Save") {
+        Button(LocalizableKey.cancel.string, role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+        Button(draft.isNew ? LocalizableKey.add.string : LocalizableKey.save.string) {
           var provider = draft.provider
           provider.name = provider.name.trimmed
           provider.baseURL = provider.baseURL.trimmed
@@ -261,93 +368,241 @@ struct ProviderEditorSheet: View {
 // MARK: - Humanizer
 
 struct HumanizerSettingsView: View {
-  @Environment(TranslateGemmaManager.self) private var gemma
+  @Environment(TranslationModelManager.self) private var gemma
+  @AppStorage(DefaultsKey.humanizationMode) private var mode = ""
+  @AppStorage(DefaultsKey.humanizationEngine) private var engine = HumanizationEngine.translateGemma
+  @AppStorage(DefaultsKey.targetAIScore) private var target = 20.0
   @AppStorage(DefaultsKey.humanizeRounds) private var rounds = 3
   @AppStorage(DefaultsKey.pivotLanguage) private var pivot = Language.japanese.code
-  @AppStorage(DefaultsKey.ollamaURL) private var ollamaURL = "http://localhost:11434"
-  @AppStorage(DefaultsKey.gemmaModel) private var model = TranslateGemmaClient.availableModels[0]
+  @AppStorage(DefaultsKey.gemmaModel) private var model = TranslationModel.default.id
+  @State private var showDownload = false
+  @State private var showDetector = false
+
+  private var selectedMode: HumanizationMode {
+    HumanizationMode(rawValue: mode) ?? (rounds > 0 ? .manual : .off)
+  }
 
   var body: some View {
     Form {
       Section {
-        Stepper(value: $rounds, in: 0...5) {
-          LabeledContent("Round trips", value: rounds == 0 ? "Off" : "\(rounds)")
+        Picker(LocalizableKey.humanizationMode.string, selection: Binding(get: { selectedMode }, set: {
+          mode = $0.rawValue
+          if $0 == .manual { rounds = max(1, rounds) }
+        })) {
+          Text(LocalizableKey.off.string).tag(HumanizationMode.off)
+          Text(LocalizableKey.manualRounds.string).tag(HumanizationMode.manual)
+          Text(LocalizableKey.automaticRounds.string).tag(HumanizationMode.automatic)
         }
-        Picker("Pivot language", selection: $pivot) {
-          ForEach(Language.all) { Text($0.name).tag($0.code) }
+        if selectedMode == .manual {
+          Stepper(value: $rounds, in: 1...Int.max) {
+            LabeledContent(LocalizableKey.roundTrips.string, value: "\(max(1, rounds))")
+          }
         }
-        .disabled(rounds == 0)
+        if selectedMode == .automatic {
+          LabeledContent(LocalizableKey.targetAIScore.string, value: "\(Int(target))/100")
+          Slider(value: $target, in: 0...100, step: 1) { Text(LocalizableKey.targetAIScore.string) }
+        }
+        if selectedMode != .off {
+          Picker(LocalizableKey.humanizationEngine.string, selection: $engine) {
+            Text(LocalizableKey.translationRoundTrip.string).tag(HumanizationEngine.translateGemma)
+            Text(LocalizableKey.selectedRewriteModel.string).tag(HumanizationEngine.rewriteModel)
+          }
+          if engine == .translateGemma {
+            Picker(LocalizableKey.pivotLanguage.string, selection: $pivot) {
+              ForEach(Language.all) { Text($0.localizedName).tag($0.code) }
+            }
+          }
+        }
       } header: {
-        Text("Reduce the AI feel")
+        Text(LocalizableKey.reduceTheAiFeel.string)
       } footer: {
-        Text("After each rewrite, TranslateGemma translates the text to the pivot language and back this many times. 0 turns it off and no translation model is used.")
+        Text(selectedMode == .automatic ? LocalizableKey.automaticRoundsHelp.string : LocalizableKey.manualRoundsHelp.string)
           .font(.caption).foregroundStyle(.secondary)
       }
 
       Section {
-        TextField("Ollama URL", text: $ollamaURL)
-          .onSubmit { gemma.refresh() }
-        Picker("Model", selection: $model) {
-          ForEach(TranslateGemmaClient.availableModels, id: \.self) { Text($0).tag($0) }
+        Button { showDetector = true; Haptics.tap() } label: {
+          LabeledContent(LocalizableKey.aiDetector.string, value: AIDetectorEngine.selected.name)
         }
-        .onChange(of: model) { gemma.refresh() }
-        statusRow
-      } header: {
-        Text("TranslateGemma")
+        .buttonStyle(.plain)
       } footer: {
-        Text("TranslateGemma is an open translation model from Google. It runs locally through Ollama and is downloaded separately (4B ≈ 3 GB).")
-          .font(.caption).foregroundStyle(.secondary)
+        Text(LocalizableKey.detectorScoreHelp.string).font(.caption).foregroundStyle(.secondary)
+      }
+
+      if engine == .translateGemma {
+        Section {
+          Picker(LocalizableKey.model.string, selection: $model) {
+            ForEach(TranslationModel.all) { Text("\($0.name) (\($0.size))").tag($0.id) }
+          }
+          .disabled(gemma.isDownloading || gemma.isRemoving)
+          .onChange(of: model) { gemma.refresh() }
+          statusRow
+        } header: {
+          Text(LocalizableKey.translationModel.string)
+        } footer: {
+          Text(TranslationModel.named(model).isNLLB ? LocalizableKey.nllbDescription.string : LocalizableKey.translategemmaIsAnOpenTranslationModelFromGoogleItRunsOnThisMacWithMlxOnAppleSiliconAndIsDownloadedSeparatelyFromHuggingFace.string)
+            .font(.caption).foregroundStyle(.secondary)
+        }
       }
     }
     .formStyle(.grouped)
+    .overlay(alignment: .bottom) { SettingsToast(toast: gemma.toast) }
     .onAppear { gemma.refresh() }
+    .sheet(isPresented: $showDownload) {
+      ModelDownloadSheet(model: TranslationModel.named(model))
+    }
+    .sheet(isPresented: $showDetector) { AIDetectorSettingsSheet() }
   }
 
   @ViewBuilder private var statusRow: some View {
     switch gemma.state {
     case .unknown, .checking:
-      LabeledContent("Status") { ProgressView().controlSize(.small) }
-    case .serverUnavailable:
-      LabeledContent("Status") {
-        Label("Ollama is not running", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-      }
-      HStack {
-        Link("Install Ollama…", destination: TranslateGemmaClient.ollamaDownloadURL)
-        Spacer()
-        Button("Check Again") { gemma.refresh() }
-      }
+      LabeledContent(LocalizableKey.status.string) { ProgressView().controlSize(.small) }
     case .notInstalled:
-      LabeledContent("Status") { Text("Not downloaded").foregroundStyle(.secondary) }
+      LabeledContent(LocalizableKey.status.string) { Text(LocalizableKey.notDownloaded.string).foregroundStyle(.secondary) }
       HStack {
         Spacer()
-        Button("Download \(model)") { gemma.download() }.buttonStyle(.borderedProminent)
+        Button(LocalizableKey.downloadAction.string) { showDownload = true }.buttonStyle(.borderedProminent)
       }
     case .installed:
-      LabeledContent("Status") { Label("Ready", systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
+      LabeledContent(LocalizableKey.status.string) { Label(LocalizableKey.ready.string, systemImage: "checkmark.circle.fill").foregroundStyle(.green) }
       HStack {
         Spacer()
         RemoveModelButton { gemma.remove() }
       }
-    case .downloading(let status, let fraction):
-      VStack(alignment: .leading, spacing: 6) {
-        if let fraction {
-          ProgressView(value: fraction) { Text(status) } currentValueLabel: { Text(fraction, format: .percent.precision(.fractionLength(0))) }
+    case .downloading(let progress):
+      LabeledContent(LocalizableKey.status.string) {
+        if let fraction = progress.fraction {
+          Text(LocalizableKey.downloadingPercent.format(fraction.formatted(.percent.precision(.fractionLength(0))))).monospacedDigit()
         } else {
-          ProgressView { Text(status) }
-        }
-        HStack {
-          Spacer()
-          Button("Cancel") { gemma.cancel() }
+          Text(LocalizableKey.startingDownload.string)
         }
       }
+      HStack {
+        Spacer()
+        Button(LocalizableKey.showDownload.string) { showDownload = true }
+      }
     case .failed(let message):
-      LabeledContent("Status") {
+      LabeledContent(LocalizableKey.status.string) {
         Label(message, systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(2)
       }
       HStack {
         Spacer()
-        Button("Retry") { gemma.refresh() }
+        Button(LocalizableKey.checkAgain.string) { gemma.refresh() }
+        Button(LocalizableKey.downloadAction.string) { showDownload = true }
       }
+    }
+  }
+}
+
+/// Downloads the selected translation model, with progress, size, speed and cancel.
+struct ModelDownloadSheet: View {
+  @Environment(TranslationModelManager.self) private var gemma
+  @Environment(\.dismiss) private var dismiss
+  let model: TranslationModel
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Form {
+        Section {
+          HStack(spacing: 12) {
+            Image(systemName: "character.bubble.fill")
+              .font(.system(size: 28))
+              .foregroundStyle(.tint)
+              .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 2) {
+              Text(model.name).font(.headline)
+              Text("\(model.size) · \(model.id)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+          }
+          .padding(.vertical, 4)
+        } footer: {
+          Text(model.isNLLB ? LocalizableKey.nllbDownloadDescription.string : LocalizableKey.downloadedFromHuggingFaceItRunsOnThisMacWithMlxAndNeverLeavesYourDevice.string)
+            .font(.caption).foregroundStyle(.secondary)
+        }
+
+        Section(LocalizableKey.progress.string) { progressContent }
+      }
+      .formStyle(.grouped)
+      Divider()
+      HStack { buttons }.padding(12)
+    }
+    .frame(width: 460)
+    .frame(minHeight: 340, maxHeight: .infinity)
+    .modelDownloadOverlay()
+    .onChange(of: gemma.state) { _, state in
+      guard state == .installed else { return }
+      Task {
+        try? await Task.sleep(for: .seconds(1))
+        dismiss()
+      }
+    }
+  }
+
+  @ViewBuilder private var progressContent: some View {
+    switch gemma.state {
+    case .downloading(let progress):
+      VStack(alignment: .leading, spacing: 8) {
+        if let fraction = progress.fraction {
+          HStack {
+            Text(LocalizableKey.downloading.string)
+            Spacer()
+            Text(fraction, format: .percent.precision(.fractionLength(0))).monospacedDigit()
+          }
+          ProgressView(value: fraction)
+          HStack {
+            Text(LocalizableKey.downloadBytes.format(progress.completedBytes.formatted(.byteCount(style: .file)), progress.totalBytes.formatted(.byteCount(style: .file))))
+            Spacer()
+            Text(progress.bytesPerSecond.map { LocalizableKey.downloadSpeed.format(Int64($0).formatted(.byteCount(style: .file))) } ?? "—")
+          }
+          .font(.callout).foregroundStyle(.secondary).monospacedDigit()
+        } else {
+          HStack {
+            Text(LocalizableKey.preparingDownload.string)
+            Spacer()
+            ProgressView().controlSize(.small)
+          }
+        }
+      }
+      .padding(.vertical, 4)
+    case .installed:
+      Label(LocalizableKey.downloadedAndReady.string, systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+    case .failed(let message):
+      Label(message, systemImage: "xmark.octagon.fill").foregroundStyle(.red).lineLimit(3)
+    case .unknown, .checking:
+      HStack { Text(LocalizableKey.checking.string); Spacer(); ProgressView().controlSize(.small) }
+    case .notInstalled:
+      Text(LocalizableKey.readyToDownload.string).foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder private var buttons: some View {
+    switch gemma.state {
+    case .downloading:
+      Button(LocalizableKey.hide.string) { dismiss() }
+      Spacer()
+      Button(LocalizableKey.cancelDownload.string, role: .destructive) {
+        gemma.cancel()
+        Haptics.tap()
+        dismiss()
+      }
+      .keyboardShortcut(.cancelAction)
+    case .installed:
+      Spacer()
+      Button(LocalizableKey.done.string) { dismiss() }.keyboardShortcut(.defaultAction)
+    case .failed:
+      Spacer()
+      Button(LocalizableKey.close.string, role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+      Button(LocalizableKey.retry.string) { gemma.download() }.keyboardShortcut(.defaultAction)
+    case .unknown, .checking, .notInstalled:
+      Spacer()
+      Button(LocalizableKey.cancel.string, role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+      Button(LocalizableKey.downloadAction.string) {
+        Haptics.tap()
+        gemma.download()
+      }
+      .keyboardShortcut(.defaultAction)
+      .disabled(gemma.state != .notInstalled)
     }
   }
 }
@@ -357,11 +612,11 @@ struct RemoveModelButton: View {
   @State private var confirm = false
 
   var body: some View {
-    Button("Remove Model…", role: .destructive) { confirm = true }
-      .confirmationDialog("Remove TranslateGemma from Ollama?", isPresented: $confirm) {
-        Button("Remove", role: .destructive, action: action)
+    Button(LocalizableKey.removeModel.string, role: .destructive) { confirm = true }
+      .confirmationDialog(LocalizableKey.removeTheDownloadedTranslategemmaModel.string, isPresented: $confirm) {
+        Button(LocalizableKey.remove.string, role: .destructive, action: action)
       } message: {
-        Text("You can download it again at any time.")
+        Text(LocalizableKey.youCanDownloadItAgainAtAnyTime.string)
       }
   }
 }

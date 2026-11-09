@@ -36,7 +36,7 @@ jobs:
           retention-days: 1
   release:
     if: ${{ !inputs.resolve_public_key_only }}
-    runs-on: macos-26
+    runs-on: [self-hosted, macOS]
     permissions:
       contents: write
     env:
@@ -74,7 +74,7 @@ jobs:
           SIGNING_CERTIFICATE_NAME: ${{ secrets.SIGNING_CERTIFICATE_NAME }}
         run: |
           xcodegen generate --spec project.yml
-          xcodebuild -project FineText.xcodeproj -scheme FineText -configuration Release -destination 'generic/platform=macOS' -archivePath output/output.xcarchive -derivedDataPath output/DerivedData CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_CERTIFICATE_NAME" OTHER_CODE_SIGN_FLAGS='--options=runtime --timestamp' ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO MARKETING_VERSION="${VERSION#v}" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" SPARKLE_PUBLIC_KEY="$SPARKLE_PUBLIC_KEY" archive
+          xcodebuild -project FineText.xcodeproj -scheme FineText -configuration Release -destination 'generic/platform=macOS' -archivePath output/output.xcarchive -derivedDataPath output/DerivedData CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_CERTIFICATE_NAME" OTHER_CODE_SIGN_FLAGS='--options=runtime --timestamp' ARCHS=arm64 MARKETING_VERSION="${VERSION#v}" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" SPARKLE_PUBLIC_KEY="$SPARKLE_PUBLIC_KEY" archive
           bash scripts/ci/sign-sparkle.sh
       - name: Package and notarize
         run: bash scripts/ci/notary.sh

@@ -13,10 +13,10 @@ enum APIError: LocalizedError {
 
   var errorDescription: String? {
     switch self {
-    case .invalidURL: "The endpoint URL is invalid."
-    case .http(let code, let message): "HTTP \(code): \(message)"
-    case .decoding(let message): "Unexpected response: \(message)"
-    case .empty: "The model returned an empty response."
+    case .invalidURL: LocalizableKey.invalidEndpoint.string
+    case .http(let code, let message): LocalizableKey.httpError.format(code, message)
+    case .decoding(let message): LocalizableKey.unexpectedResponse.format(message)
+    case .empty: LocalizableKey.theModelReturnedAnEmptyResponse.string
     }
   }
 }
@@ -62,7 +62,7 @@ struct OpenAIClient: Sendable {
       if let message = json["message"] as? String { return message }
     }
     let text = String(decoding: data.prefix(400), as: UTF8.self).trimmed
-    return text.isEmpty ? "Request failed" : text
+    return text.isEmpty ? LocalizableKey.requestFailed.string : text
   }
 
   // MARK: Models
@@ -71,7 +71,7 @@ struct OpenAIClient: Sendable {
     let (data, response) = try await URLSession.shared.data(for: request("models", timeout: 30))
     try await Self.check(response) { data }
     guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-      throw APIError.decoding("models list is not an object")
+      throw APIError.decoding(LocalizableKey.modelsListIsNotAnObject.string)
     }
     let items = (json["data"] as? [[String: Any]]) ?? (json["models"] as? [[String: Any]]) ?? []
     return items.compactMap(Self.classify).sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
@@ -149,7 +149,7 @@ struct OpenAIClient: Sendable {
         guard let data = payload.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
         if let error = json["error"] as? [String: Any] {
-          throw APIError.http(500, (error["message"] as? String) ?? "Stream error")
+          throw APIError.http(500, (error["message"] as? String) ?? LocalizableKey.streamError.string)
         }
         guard let choices = json["choices"] as? [[String: Any]],
               let delta = choices.first?["delta"] as? [String: Any],
@@ -164,14 +164,61 @@ struct OpenAIClient: Sendable {
 
   // MARK: Images
 
-  func generateImage(model: String, prompt: String, size: String) async throws -> Data {
+  /// `transparent` asks GPT Image models for a PNG with an alpha channel.
+  func generateImage(model: String, prompt: String, size: String, transparent: Bool = false) async throws -> Data {
     var body: [String: Any] = ["model": model, "prompt": prompt, "n": 1, "size": size]
     if model.lowercased().contains("dall-e") { body["response_format"] = "b64_json" }
+    if transparent {
+      body["background"] = "transparent"
+      body["output_format"] = "png"
+    }
     let (data, response) = try await URLSession.shared.data(for: request("images/generations", method: "POST", body: body, timeout: 600))
     try await Self.check(response) { data }
+    return try await Self.decodeImage(data)
+  }
+
+  /// Edits an existing image (`POST /images/edits`, multipart). Throws `APIError.http` with 404/405/415/501
+  /// when the endpoint or model doesn't support edits; see `isEditUnsupported`.
+  func editImage(model: String, image: Data, prompt: String, size: String, transparent: Bool = false) async throws -> Data {
+    let boundary = "FineText-\(UUID().uuidString)"
+    var body = Data()
+    func append(_ string: String) { body.append(Data(string.utf8)) }
+    func field(_ name: String, _ value: String) {
+      append("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n")
+    }
+    field("model", model)
+    field("prompt", prompt)
+    field("n", "1")
+    field("size", size)
+    if transparent {
+      field("background", "transparent")
+      field("output_format", "png")
+    }
+    append("--\(boundary)\r\nContent-Disposition: form-data; name=\"image\"; filename=\"image.png\"\r\nContent-Type: image/png\r\n\r\n")
+    body.append(image)
+    append("\r\n--\(boundary)--\r\n")
+
+    var request = try request("images/edits", method: "POST", timeout: 600)
+    request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+    request.httpBody = body
+    let (data, response) = try await URLSession.shared.data(for: request)
+    try await Self.check(response) { data }
+    return try await Self.decodeImage(data)
+  }
+
+  /// True when an edit failed because the provider has no edit endpoint for this model, so the caller
+  /// should fall back to regenerating from a combined prompt.
+  static func isEditUnsupported(_ error: Error) -> Bool {
+    guard case APIError.http(let code, let message) = error else { return false }
+    if [404, 405, 415, 501].contains(code) { return true }
+    let lower = message.lowercased()
+    return code == 400 && (lower.contains("not supported") || lower.contains("unsupported") || lower.contains("does not support"))
+  }
+
+  private static func decodeImage(_ data: Data) async throws -> Data {
     guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
           let first = (json["data"] as? [[String: Any]])?.first else {
-      throw APIError.decoding("no image in response")
+      throw APIError.decoding(LocalizableKey.noImageInResponse.string)
     }
     if let base64 = first["b64_json"] as? String, let image = Data(base64Encoded: base64) { return image }
     if let link = first["url"] as? String, let url = URL(string: link) {
@@ -179,9 +226,9 @@ struct OpenAIClient: Sendable {
         return image
       }
       let (image, imageResponse) = try await URLSession.shared.data(from: url)
-      try await Self.check(imageResponse) { image }
+      try await check(imageResponse) { image }
       return image
     }
-    throw APIError.decoding("image payload missing")
+    throw APIError.decoding(LocalizableKey.imagePayloadMissing.string)
   }
 }

@@ -3,39 +3,90 @@ import Foundation
 // MARK: - Platforms & tones
 
 enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
-  case x, reddit, linkedin, blog
+  case x, xReply, xThread, reddit, redditComment, linkedin, blog, message
 
   var id: String { rawValue }
 
   var title: String {
     switch self {
-    case .x: "X"
-    case .reddit: "Reddit"
+    case .x, .xReply, .xThread: "X · \(variantTitle)"
+    case .reddit, .redditComment: "Reddit · \(variantTitle)"
     case .linkedin: "LinkedIn"
+    case .blog: LocalizableKey.blogPost.string
+    case .message: LocalizableKey.message.string
+    }
+  }
+
+  /// Top-level entries; variants are selected in a submenu before the model.
+  static let menuPlatforms: [Platform] = [.x, .reddit, .linkedin, .blog, .message]
+
+  var variants: [Platform] {
+    switch self {
+    case .x, .xReply, .xThread: [.x, .xReply, .xThread]
+    case .reddit, .redditComment: [.reddit, .redditComment]
+    default: []
+    }
+  }
+
+  var menuTitle: String {
+    switch self {
+    case .x, .xReply, .xThread: "X"
+    case .reddit, .redditComment: "Reddit"
+    default: title
+    }
+  }
+
+  var variantTitle: String {
+    switch self {
+    case .x, .reddit: LocalizableKey.postVariant.string
+    case .xReply: LocalizableKey.replyVariant.string
+    case .xThread: LocalizableKey.threadVariant.string
+    case .redditComment: LocalizableKey.commentVariant.string
+    default: title
+    }
+  }
+
+  /// Stable English label used in model instructions.
+  var promptTitle: String {
+    switch self {
+    case .x: "X Post"
+    case .xReply: "X Reply"
+    case .xThread: "X Thread"
+    case .reddit: "Reddit Post"
+    case .redditComment: "Reddit Comment"
     case .blog: "Blog Post"
+    case .message: "Message"
+    default: title
     }
   }
 
   var symbol: String {
     switch self {
-    case .x: "xmark"
-    case .reddit: "bubble.left.and.bubble.right"
+    case .x, .xReply, .xThread: "xmark"
+    case .reddit, .redditComment: "bubble.left.and.bubble.right"
     case .linkedin: "briefcase"
     case .blog: "doc.richtext"
+    case .message: "message"
     }
   }
 
   var defaultTone: Tone {
     switch self {
-    case .x: .witty
-    case .reddit: .casual
+    case .x, .xReply, .xThread: .witty
+    case .reddit, .redditComment: .casual
     case .linkedin: .professional
     case .blog: .storytelling
+    case .message: .natural
     }
   }
 
   /// Soft character limit shown in the editor; nil means no limit.
-  var characterLimit: Int? { self == .x ? 280 : nil }
+  var characterLimit: Int? {
+    switch self {
+    case .x, .xReply: 280
+    default: nil
+    }
+  }
 
   var guidelines: String {
     switch self {
@@ -45,11 +96,31 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
       - Lead with the most interesting idea. Punchy, scannable.
       - At most 1-2 relevant hashtags, only if they add value. No hashtag walls.
       """
+    case .xReply:
+      """
+      - A single reply of at most 280 characters (count carefully).
+      - Respond directly and naturally to the point in the source; keep the author's intended meaning.
+      - No title, thread numbering, or hashtags. Do not invent context about the post being replied to.
+      """
+    case .xThread:
+      """
+      - A thread of connected X posts, each at most 280 characters including its numbering.
+      - Separate posts with a blank line and number them 1/N, 2/N, and so on.
+      - Open with a clear hook. Give each post a complete thought and keep a logical progression.
+      - Use only as many posts as needed. Preserve the source facts; do not pad or invent details.
+      """
     case .reddit:
       """
       - Start with a line "Title: <title>" followed by a blank line and the body.
       - Conversational and authentic, like a community member, not a marketer.
       - No hashtags. Markdown is allowed. Invite discussion naturally at the end.
+      """
+    case .redditComment:
+      """
+      - A Reddit comment, not a standalone post: no title or "Title:" line.
+      - Conversational, authentic, and relevant to the point in the source, like a community member.
+      - Preserve the author's intent. Do not invent context about the parent post or other commenters.
+      - No hashtags or promotional language. Markdown is allowed; keep the response focused.
       """
     case .linkedin:
       """
@@ -63,18 +134,51 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
       - Around 400-900 words, expanding on the original with useful detail but no invented facts.
       - Clear, readable paragraphs.
       """
+    case .message:
+      """
+      - A chat message for a messaging app (iMessage, WhatsApp, Telegram, Slack DMs), written the way a real \
+      person texts the people they know.
+      - Natural and spoken: contractions, everyday words, short sentences. It should sound like the author \
+      would say it out loud. Sentence fragments are fine.
+      - No title, no hashtags, no Markdown, no bullet lists, no sign-off or formal greeting, no "I hope this \
+      message finds you well".
+      - Keep it short. Break longer content into a few short lines or paragraphs instead of one block.
+      - Don't sound like an announcement, an email or marketing copy. Only use an emoji if it fits naturally.
+      """
     }
   }
 }
 
+/// Reusable rewrite rules. IDs remain stable when the user renames a preset.
+struct CustomPlatform: Codable, Identifiable, Hashable, Sendable {
+  var id = UUID()
+  var name: String
+  var instruction: String
+}
+
 enum Tone: String, CaseIterable, Codable, Identifiable, Sendable {
-  case professional, casual, witty, friendly, enthusiastic, informative, storytelling, bold, concise, empathetic
+  case natural, professional, casual, witty, friendly, enthusiastic, informative, storytelling, bold, concise, empathetic
 
   var id: String { rawValue }
-  var title: String { rawValue.capitalized }
+  var title: String {
+    switch self {
+    case .natural: LocalizableKey.natural.string
+    case .professional: LocalizableKey.professional.string
+    case .casual: LocalizableKey.casual.string
+    case .witty: LocalizableKey.witty.string
+    case .friendly: LocalizableKey.friendly.string
+    case .enthusiastic: LocalizableKey.enthusiastic.string
+    case .informative: LocalizableKey.informative.string
+    case .storytelling: LocalizableKey.storytelling.string
+    case .bold: LocalizableKey.bold.string
+    case .concise: LocalizableKey.concise.string
+    case .empathetic: LocalizableKey.empathetic.string
+    }
+  }
 
   var guidance: String {
     switch self {
+    case .natural: "how the author would actually say it in person: plain words, relaxed rhythm, nothing performative"
     case .professional: "polished, credible and confident without jargon"
     case .casual: "relaxed and conversational, like talking to a friend"
     case .witty: "clever and playful with light humor, never cringe"
@@ -95,6 +199,12 @@ struct Language: Hashable, Codable, Identifiable, Sendable {
   let code: String
   let name: String
   var id: String { code }
+
+  /// Localized display name; `name` stays stable for Codable and model prompts.
+  var localizedName: String {
+    Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+      .localizedString(forIdentifier: code) ?? name
+  }
 
   static let english = Language(code: "en", name: "English")
   static let japanese = Language(code: "ja", name: "Japanese")
@@ -135,11 +245,17 @@ struct Provider: Codable, Identifiable, Hashable, Sendable {
   var id = UUID()
   var name: String
   var baseURL: String
+
+  /// Pseudo provider id for MLX models downloaded from Hugging Face and run on this Mac.
+  static let localID = UUID(uuidString: "00000000-0000-0000-0000-00000000F17E")!
+  static var localName: String { LocalizableKey.onThisMac.string }
 }
 
 struct ModelRef: Codable, Hashable, Sendable {
   let providerID: UUID
   let modelID: String
+
+  var isLocal: Bool { providerID == Provider.localID }
 }
 
 enum ModelKind: String, Sendable {
@@ -166,7 +282,13 @@ enum JobStatus: Equatable, Sendable {
 enum ImageSize: String, CaseIterable, Identifiable, Sendable {
   case square, landscape, portrait
   var id: String { rawValue }
-  var title: String { rawValue.capitalized }
+  var title: String {
+    switch self {
+    case .square: LocalizableKey.square.string
+    case .landscape: LocalizableKey.landscape.string
+    case .portrait: LocalizableKey.portrait.string
+    }
+  }
 
   func value(for modelID: String) -> String {
     let dalle3 = modelID.lowercased().contains("dall-e-3")
@@ -181,21 +303,28 @@ enum ImageSize: String, CaseIterable, Identifiable, Sendable {
 // MARK: - Defaults
 
 enum DefaultsKey {
+  static let humanizationMode = "humanizationMode"
+  static let humanizationEngine = "humanizationEngine"
+  static let detectorEngine = "aiDetectorEngine"
+  static let targetAIScore = "targetAIScore"
   static let humanizeRounds = "humanizeRounds"
   static let pivotLanguage = "pivotLanguage"
-  static let ollamaURL = "ollamaURL"
-  static let gemmaModel = "translateGemmaModel"
+  static let gemmaModel = "translateGemmaMLXModel"
   static let draft = "draftText"
   static let providers = "providers"
   static let modelCache = "modelCache"
   static let preferences = "preferences"
+  static let localModels = "localModels"
+  static let settingsTab = "settingsTab"
 
   static func register() {
     UserDefaults.standard.register(defaults: [
       humanizeRounds: 3,
       pivotLanguage: Language.japanese.code,
-      ollamaURL: "http://localhost:11434",
-      gemmaModel: "translategemma:4b",
+      gemmaModel: TranslationModel.default.id,
+      humanizationEngine: HumanizationEngine.translateGemma.rawValue,
+      detectorEngine: AIDetectorEngine.disabled.rawValue,
+      targetAIScore: 20.0,
     ])
   }
 }

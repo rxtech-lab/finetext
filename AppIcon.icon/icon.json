@@ -1,0 +1,57 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "extended-srgb:0.14118,0.36078,0.49020,1.00000",
+      "extended-srgb:0.09804,0.27451,0.38431,1.00000"
+    ]
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "t-bar.svg",
+          "name" : "T Bar"
+        },
+        {
+          "glass" : true,
+          "image-name" : "t-stem.svg",
+          "name" : "T Stem"
+        }
+      ],
+      "lighting" : "combined",
+      "name" : "Letter",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.3
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "arrow.svg",
+          "name" : "Refine Arrow"
+        }
+      ],
+      "name" : "Arrow",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.3
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}
