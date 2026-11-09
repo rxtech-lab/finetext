@@ -1,0 +1,534 @@
+import SwiftUI
+
+struct MenuContentView: View {
+  @Environment(Workspace.self) private var workspace
+
+  var body: some View {
+    ZStack {
+      if let route = workspace.route {
+        Group {
+          switch route {
+          case .rewrite(let id): RewriteDetailView(id: id)
+          case .translation(let id): TranslationDetailView(id: id)
+          case .image(let id): ImageDetailView(id: id)
+          case .history: HistoryView()
+          }
+        }
+        .transition(.move(edge: .trailing))
+      } else {
+        HomeView().transition(.move(edge: .leading))
+      }
+    }
+    .frame(width: 440, height: 640)
+    .animation(.snappy(duration: 0.25), value: workspace.route)
+    .overlay(alignment: .bottom) { ToastOverlay() }
+  }
+}
+
+// MARK: - Home
+
+struct HomeView: View {
+  @Environment(Workspace.self) private var workspace
+  @Environment(AppUpdater.self) private var updater
+  @Environment(\.openSettings) private var openSettings
+  @State private var confirmClear = false
+
+  var body: some View {
+    @Bindable var workspace = workspace
+    VStack(spacing: 0) {
+      HStack(spacing: 10) {
+        Label("FineText", systemImage: "wand.and.sparkles")
+          .font(.headline)
+        Spacer()
+        IconButton("clock.arrow.circlepath", help: "History") { workspace.route = .history }
+        IconButton("gearshape", help: "Settings") {
+          NSApp.activate()
+          openSettings()
+        }
+        Menu {
+          Button("Check for Updates…") { updater.checkForUpdates() }
+            .disabled(!updater.isConfigured)
+          Divider()
+          Button("Quit FineText") { NSApp.terminate(nil) }
+        } label: {
+          Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+
+      Divider()
+
+      ScrollView {
+        VStack(alignment: .leading, spacing: 14) {
+          OriginalEditor(confirmClear: $confirmClear)
+          Picker("", selection: $workspace.tab) {
+            ForEach(WorkTab.allCases) { Text($0.rawValue).tag($0) }
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+
+          switch workspace.tab {
+          case .rewrite: RewriteSection()
+          case .translate: TranslateSection()
+          case .image: ImageSection()
+          }
+        }
+        .padding(14)
+      }
+
+      Divider()
+
+      HStack {
+        Text(footerHint).font(.caption).foregroundStyle(.secondary)
+        Spacer()
+        Button {
+          workspace.runAll()
+        } label: {
+          Label(runTitle, systemImage: "sparkles")
+        }
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.return, modifiers: .command)
+        .disabled(!workspace.canRunAll)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+    }
+    .confirmationDialog("Clear this session?", isPresented: $confirmClear) {
+      Button("Clear", role: .destructive) { workspace.clear() }
+    } message: {
+      Text("Starts a new session. The current one stays in History.")
+    }
+  }
+
+  private var runTitle: String {
+    switch workspace.tab {
+    case .rewrite: "Rewrite All"
+    case .translate: "Translate All"
+    case .image: "Generate All"
+    }
+  }
+
+  private var footerHint: String {
+    switch workspace.tab {
+    case .rewrite: "\(workspace.session.rewrites.count) platform(s)"
+    case .translate: "\(workspace.session.translations.count) language(s)"
+    case .image: "\(workspace.session.images.count) image(s)"
+    }
+  }
+}
+
+struct OriginalEditor: View {
+  @Environment(Workspace.self) private var workspace
+  @Binding var confirmClear: Bool
+
+  var body: some View {
+    @Bindable var workspace = workspace
+    VStack(alignment: .leading, spacing: 6) {
+      HStack {
+        Text("Original post").font(.subheadline.weight(.semibold))
+        Spacer()
+        Button("Paste") {
+          if let text = NSPasteboard.general.string(forType: .string) {
+            workspace.originalText = text
+            Haptics.tap()
+          }
+        }
+        .buttonStyle(.borderless)
+        Button("Clear", role: .destructive) { confirmClear = true }
+          .buttonStyle(.borderless)
+          .disabled(workspace.session.isEmpty)
+      }
+      ZStack(alignment: .topLeading) {
+        TextEditor(text: $workspace.originalText)
+          .font(.body)
+          .scrollContentBackground(.hidden)
+          .padding(6)
+        if workspace.originalText.isEmpty {
+          Text("Paste or type the post you want to refine…")
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .allowsHitTesting(false)
+        }
+      }
+      .frame(height: 130)
+      .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+      .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+      Text("\(workspace.originalText.count) characters")
+        .font(.caption2).foregroundStyle(.secondary)
+    }
+  }
+}
+
+// MARK: - Sections
+
+struct RewriteSection: View {
+  @Environment(Workspace.self) private var workspace
+  @Environment(Preferences.self) private var preferences
+  @Environment(ProviderStore.self) private var providers
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Menu {
+        if let platform = preferences.lastPlatform, let model = preferences.lastModel(.rewrite), providers.provider(model.providerID) != nil {
+          Button("Again: \(platform.title) · \(providers.displayName(model))") {
+            workspace.addRewrite(platform: platform, model: model)
+          }
+          Divider()
+        }
+        ForEach(Platform.allCases) { platform in
+          Menu {
+            ModelMenuItems(kind: .text, purpose: .rewrite) { workspace.addRewrite(platform: platform, model: $0) }
+          } label: {
+            if platform == preferences.lastPlatform {
+              Label(platform.title, systemImage: "checkmark")
+            } else {
+              Text(platform.title)
+            }
+          }
+        }
+      } label: {
+        Label("Add Platform", systemImage: "plus.circle.fill")
+      }
+      .fixedSize()
+
+      if workspace.session.rewrites.isEmpty {
+        EmptyHint(symbol: "text.badge.plus", text: "Add a platform, pick a model, then rewrite.")
+      }
+      ForEach(workspace.session.sortedRewrites) { item in
+        JobCard(
+          symbol: item.platform.symbol,
+          title: "\(item.platform.title) · \(item.tone.title)",
+          subtitle: providers.displayName(item.model),
+          status: workspace.status(item.id),
+          preview: item.output,
+          note: item.note,
+          onRun: { workspace.run(item) },
+          onStop: { workspace.stop(item.id) },
+          onCopy: { workspace.copy(item.output) },
+          onOpen: { workspace.route = .rewrite(item.id) }
+        )
+      }
+    }
+  }
+}
+
+struct TranslateSection: View {
+  @Environment(Workspace.self) private var workspace
+  @Environment(Preferences.self) private var preferences
+  @Environment(ProviderStore.self) private var providers
+  @State private var source: UUID?
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        Menu {
+          if let language = preferences.lastLanguage, let model = preferences.lastModel(.translate), providers.provider(model.providerID) != nil {
+            Button("Again: \(language.name) · \(providers.displayName(model))") {
+              workspace.addTranslation(language: language, model: model, source: validSource)
+            }
+            Divider()
+          }
+          ForEach(Language.all) { language in
+            Menu {
+              ModelMenuItems(kind: .text, purpose: .translate) {
+                workspace.addTranslation(language: language, model: $0, source: validSource)
+              }
+            } label: {
+              if language == preferences.lastLanguage {
+                Label(language.name, systemImage: "checkmark")
+              } else {
+                Text(language.name)
+              }
+            }
+          }
+        } label: {
+          Label("Add Language", systemImage: "plus.circle.fill")
+        }
+        .fixedSize()
+        Spacer()
+        Picker("From", selection: $source) {
+          Text("Original").tag(UUID?.none)
+          ForEach(workspace.session.sortedRewrites.filter { !$0.output.isEmpty }) { rewrite in
+            Text("\(rewrite.platform.title) · \(rewrite.tone.title)").tag(UUID?.some(rewrite.id))
+          }
+        }
+        .fixedSize()
+      }
+
+      if workspace.session.translations.isEmpty {
+        EmptyHint(symbol: "globe", text: "Add a language to translate the original or a rewrite.")
+      }
+      ForEach(workspace.session.sortedTranslations) { item in
+        JobCard(
+          symbol: "globe",
+          title: "\(item.language.name) · from \(workspace.sourceTitle(for: item))",
+          subtitle: providers.displayName(item.model),
+          status: workspace.status(item.id),
+          preview: item.output,
+          note: nil,
+          onRun: { workspace.run(item) },
+          onStop: { workspace.stop(item.id) },
+          onCopy: { workspace.copy(item.output) },
+          onOpen: { workspace.route = .translation(item.id) }
+        )
+      }
+    }
+  }
+
+  private var validSource: UUID? {
+    guard let source, workspace.session.rewrites.contains(where: { $0.id == source }) else { return nil }
+    return source
+  }
+}
+
+struct ImageSection: View {
+  @Environment(Workspace.self) private var workspace
+  @Environment(ProviderStore.self) private var providers
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Menu {
+        ModelMenuItems(kind: .image, purpose: .image) { model in
+          let item = workspace.addImage(model: model)
+          workspace.route = .image(item.id)
+        }
+      } label: {
+        Label("Add Image", systemImage: "plus.circle.fill")
+      }
+      .fixedSize()
+
+      if workspace.session.images.isEmpty {
+        EmptyHint(symbol: "photo.badge.plus", text: "Pick an image model, add optional art direction, then generate.")
+      }
+      ForEach(workspace.session.sortedImages) { item in
+        ImageCard(item: item)
+      }
+    }
+  }
+}
+
+struct ImageCard: View {
+  @Environment(Workspace.self) private var workspace
+  @Environment(ProviderStore.self) private var providers
+  let item: ImageItem
+
+  var body: some View {
+    let status = workspace.status(item.id)
+    HStack(alignment: .top, spacing: 10) {
+      Group {
+        if let data = item.imageData, let image = NSImage(data: data) {
+          Image(nsImage: image).resizable().scaledToFill()
+        } else {
+          ZStack {
+            Rectangle().fill(.quaternary)
+            if status.isRunning { ProgressView().controlSize(.small) } else { Image(systemName: "photo").foregroundStyle(.secondary) }
+          }
+        }
+      }
+      .frame(width: 64, height: 64)
+      .clipShape(RoundedRectangle(cornerRadius: 6))
+
+      VStack(alignment: .leading, spacing: 4) {
+        Text(providers.displayName(item.model)).font(.subheadline.weight(.semibold)).lineLimit(1)
+        Text(item.instruction.isEmpty ? "No art direction · \(item.size.title)" : item.instruction)
+          .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        StatusLine(status: status)
+      }
+      Spacer(minLength: 0)
+      VStack(spacing: 6) {
+        if status.isRunning {
+          IconButton("stop.circle", help: "Stop") { workspace.stop(item.id) }
+        } else {
+          IconButton("sparkles", help: "Generate") { workspace.run(item) }
+        }
+        if item.imageData != nil {
+          IconButton("doc.on.doc", help: "Copy image") { workspace.copyImage(item) }
+        }
+      }
+    }
+    .padding(10)
+    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
+    .contentShape(Rectangle())
+    .onTapGesture { workspace.route = .image(item.id) }
+  }
+}
+
+// MARK: - Shared components
+
+struct JobCard: View {
+  let symbol: String
+  let title: String
+  let subtitle: String
+  let status: JobStatus
+  let preview: String
+  let note: String?
+  let onRun: () -> Void
+  let onStop: () -> Void
+  let onCopy: () -> Void
+  let onOpen: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 8) {
+        Image(systemName: symbol).frame(width: 18).foregroundStyle(.tint)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
+          Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+        }
+        Spacer()
+        if status.isRunning {
+          IconButton("stop.circle", help: "Stop", action: onStop)
+        } else {
+          IconButton(preview.isEmpty ? "sparkles" : "arrow.clockwise", help: preview.isEmpty ? "Run" : "Regenerate", action: onRun)
+        }
+        IconButton("doc.on.doc", help: "Copy", action: onCopy).disabled(preview.isEmpty)
+        IconButton("chevron.right", help: "Open", action: onOpen)
+      }
+      StatusLine(status: status)
+      if !preview.isEmpty {
+        Text(preview).font(.callout).lineLimit(4).foregroundStyle(.primary.opacity(0.85))
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      if let note {
+        Label(note, systemImage: "info.circle").font(.caption2).foregroundStyle(.orange)
+      }
+    }
+    .padding(10)
+    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
+    .contentShape(Rectangle())
+    .onTapGesture(perform: onOpen)
+  }
+}
+
+struct StatusLine: View {
+  let status: JobStatus
+
+  var body: some View {
+    switch status {
+    case .idle, .done: EmptyView()
+    case .running(let message):
+      HStack(spacing: 6) {
+        ProgressView().controlSize(.mini)
+        Text(message).font(.caption).foregroundStyle(.secondary)
+      }
+    case .failed(let message):
+      Label(message, systemImage: "exclamationmark.triangle.fill")
+        .font(.caption).foregroundStyle(.red).lineLimit(3)
+    }
+  }
+}
+
+struct IconButton: View {
+  let symbol: String
+  let help: String
+  let action: () -> Void
+
+  init(_ symbol: String, help: String, action: @escaping () -> Void) {
+    self.symbol = symbol
+    self.help = help
+    self.action = action
+  }
+
+  var body: some View {
+    Button(action: action) {
+      Image(systemName: symbol).frame(width: 20, height: 20).contentShape(Rectangle())
+    }
+    .buttonStyle(.borderless)
+    .help(help)
+  }
+}
+
+struct EmptyHint: View {
+  let symbol: String
+  let text: String
+
+  var body: some View {
+    HStack(spacing: 10) {
+      Image(systemName: symbol).font(.title3).foregroundStyle(.secondary)
+      Text(text).font(.callout).foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(12)
+    .background(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator, style: StrokeStyle(lineWidth: 1, dash: [4])))
+  }
+}
+
+struct ToastOverlay: View {
+  @Environment(Workspace.self) private var workspace
+
+  var body: some View {
+    Group {
+      if let toast = workspace.toast {
+        Label(toast.message, systemImage: toast.symbol)
+          .font(.callout.weight(.medium))
+          .foregroundStyle(toast.isError ? .red : .primary)
+          .padding(.horizontal, 14)
+          .padding(.vertical, 8)
+          .background(.regularMaterial, in: Capsule())
+          .shadow(radius: 6, y: 2)
+          .padding(.bottom, 60)
+          .transition(.move(edge: .bottom).combined(with: .opacity))
+          .id(toast.id)
+      }
+    }
+    .animation(.spring(duration: 0.3), value: workspace.toast)
+  }
+}
+
+/// Model picker shared by every "Add …" menu: recent picks first, then each provider's models
+/// filtered by capability (text vs image).
+struct ModelMenuItems: View {
+  @Environment(ProviderStore.self) private var providers
+  @Environment(Preferences.self) private var preferences
+  @Environment(\.openSettings) private var openSettings
+  let kind: ModelKind
+  let purpose: Preferences.Purpose
+  let onPick: (ModelRef) -> Void
+
+  var body: some View {
+    if providers.providers.isEmpty {
+      Button("Add a Provider in Settings…") {
+        NSApp.activate()
+        openSettings()
+      }
+    } else {
+      let last = preferences.lastModel(purpose)
+      let recent = preferences.recentModels(purpose).filter { ref in
+        providers.models(for: ref.providerID, kind: kind).contains { $0.id == ref.modelID }
+      }
+      if !recent.isEmpty {
+        Section("Recent") {
+          ForEach(recent, id: \.self) { ref in
+            pickButton(providers.displayName(ref), ref: ref, selected: ref == last)
+          }
+        }
+      }
+      ForEach(providers.providers) { provider in
+        let models = providers.models(for: provider.id, kind: kind)
+        Menu(provider.name) {
+          if models.isEmpty {
+            Text(providers.loading.contains(provider.id) ? "Loading models…" : "No \(kind.rawValue) models found")
+            Button("Refresh Models") { Task { await providers.refresh(provider.id) } }
+          }
+          ForEach(models) { model in
+            let ref = ModelRef(providerID: provider.id, modelID: model.id)
+            pickButton(model.id, ref: ref, selected: ref == last)
+          }
+        }
+      }
+    }
+  }
+
+  @ViewBuilder private func pickButton(_ title: String, ref: ModelRef, selected: Bool) -> some View {
+    Button {
+      onPick(ref)
+    } label: {
+      if selected { Label(title, systemImage: "checkmark") } else { Text(title) }
+    }
+  }
+}

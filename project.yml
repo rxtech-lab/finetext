@@ -1,0 +1,55 @@
+name: FineText
+options:
+  bundleIdPrefix: app.rxlab
+  deploymentTarget:
+    macOS: '15.0'
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.1
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 1
+    GENERATE_INFOPLIST_FILE: YES
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: P9KK452K8P
+    INFOPLIST_KEY_CFBundleDisplayName: FineText
+    INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+configFiles:
+  Debug: Configuration/Debug.xcconfig
+  Release: Configuration/Release.xcconfig
+targets:
+  FineText:
+    type: application
+    platform: macOS
+    sources:
+      - path: FineText
+    dependencies:
+      - package: Sparkle
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.rxlab.finetext
+        PRODUCT_NAME: FineText
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Configuration/FineText.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/../Frameworks
+        INFOPLIST_KEY_NSHumanReadableCopyright: © 2026 RxLab
+    info:
+      path: Generated/Info.plist
+      properties:
+        LSUIElement: true
+        SUFeedURL: https://update.finetext.rxlab.app/appcast.xml
+        SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
+        SUEnableInstallerLauncherService: true
+        SUEnableAutomaticChecks: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+schemes:
+  FineText:
+    build:
+      targets:
+        FineText: all

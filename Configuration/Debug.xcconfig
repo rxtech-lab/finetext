@@ -1,0 +1,2 @@
+// Debug builds do not start the Sparkle updater (no public key).
+SPARKLE_PUBLIC_KEY =

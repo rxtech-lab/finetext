@@ -1,0 +1,10 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+FineText.xcodeproj/
+Generated/
+output/
+FineText.dmg
+__pycache__/
