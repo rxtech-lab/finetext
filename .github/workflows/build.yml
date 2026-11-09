@@ -20,9 +20,46 @@ jobs:
         run: |
           python3 scripts/ci/test_sign_sparkle.py
           python3 scripts/ci/test_select_signing_identity.py
+          python3 scripts/ci/test_validate_notary.py
       - name: Test RxAgentSDK CLI integrations
         run: python3 scripts/test-claude-code.py
       - name: Test AI detector and automatic humanization
         run: python3 scripts/test-humanization.py
       - name: Build (unsigned)
         run: xcodebuild -project FineText.xcodeproj -scheme FineText -configuration Release -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO build
+  notarization:
+    needs: test
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 45
+    env:
+      APPLE_TEAM_ID: T7GYB573Y6
+      SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Validate RxLab notarization credentials
+        env:
+          APPLE_ID: ${{ secrets.RXLAB_APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.RXLAB_APPLE_ID_PWD }}
+        run: bash scripts/ci/validate-notary.sh
+      - run: brew install xcodegen
+      - uses: apple-actions/import-codesign-certs@v3
+        with:
+          keychain: finetext-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+      - name: Select RxLab Developer ID certificate
+        run: python3 scripts/ci/select-signing-identity.py
+      - name: Archive and sign
+        run: |
+          test -n "$SPARKLE_PUBLIC_KEY" || { echo '::error::SPARKLE_PUBLIC_KEY repository variable is required'; exit 1; }
+          xcodegen generate --spec project.yml
+          xcodebuild -project FineText.xcodeproj -scheme FineText -configuration Release -destination 'generic/platform=macOS' -archivePath output/output.xcarchive -derivedDataPath output/DerivedData DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_CERTIFICATE_NAME" OTHER_CODE_SIGN_FLAGS='--options=runtime --timestamp' ARCHS=arm64 MARKETING_VERSION=0.0.0 CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" SPARKLE_PUBLIC_KEY="$SPARKLE_PUBLIC_KEY" archive
+          bash scripts/ci/sign-sparkle.sh
+      - name: Notarize and validate app and DMG
+        env:
+          APPLE_ID: ${{ secrets.RXLAB_APPLE_ID }}
+          APPLE_ID_PWD: ${{ secrets.RXLAB_APPLE_ID_PWD }}
+        run: bash scripts/ci/notary.sh

@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 : "${APPLE_ID:?}" "${APPLE_ID_PWD:?}" "${APPLE_TEAM_ID:?}" "${SIGNING_CERTIFICATE_NAME:?}"
+bash "$(dirname "$0")/validate-notary.sh"
 APP_PATH=output/output.xcarchive/Products/Applications/FineText.app
 codesign --verify --deep --strict "$APP_PATH"
 # Notarize and staple the app before making the distribution image.
