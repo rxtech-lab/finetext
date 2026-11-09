@@ -23,7 +23,10 @@ def validate(feed_path, archive_path, plist_path, download_prefix):
     assert int(enclosure.get("length", "0")) == archive.stat().st_size, "Wrong archive length"
     assert item.findtext(ns + "version") == app["CFBundleVersion"] == os.environ["BUILD_NUMBER"], "Wrong build number"
     assert item.findtext(ns + "shortVersionString") == app["CFBundleShortVersionString"] == os.environ["VERSION"].removeprefix("v"), "Wrong marketing version"
-    assert item.findtext(ns + "minimumSystemVersion") == "15.0", "Wrong minimum macOS version"
+    minimum_os = app.get("LSMinimumSystemVersion")
+    assert minimum_os, "Missing minimum macOS version in the app"
+    assert tuple(map(int, minimum_os.split("."))) >= (26, 0), "App requires macOS older than 26.0"
+    assert item.findtext(ns + "minimumSystemVersion") == minimum_os, "Wrong minimum macOS version"
     assert app["SUFeedURL"] == "https://update.finetext.rxlab.app/appcast.xml", "Wrong feed URL"
     assert item.findtext(ns + "releaseNotesLink") == "https://update.finetext.rxlab.app/FineText.html", "Wrong release notes URL"
     key = Ed25519PublicKey.from_public_bytes(base64.b64decode(app["SUPublicEDKey"], validate=True))
