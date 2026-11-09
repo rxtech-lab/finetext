@@ -26,5 +26,7 @@ retry_codesign "$APP_PATH/Contents/Frameworks/Sparkle.framework"
 retry_codesign --preserve-metadata=entitlements "$APP_PATH"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
+# FineText intentionally disables App Sandbox so local agent CLIs can run.
+# Require the explicit false value so lost entitlements still fail validation.
 codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null |
-  python3 -c 'import plistlib,sys; e=plistlib.loads(sys.stdin.buffer.read()); assert e.get("com.apple.security.app-sandbox"); assert "app.rxlab.finetext-spki" in e.get("com.apple.security.temporary-exception.mach-lookup.global-name", [])'
+  python3 -c 'import plistlib,sys; e=plistlib.loads(sys.stdin.buffer.read()); assert e.get("com.apple.security.app-sandbox") is False, "FineText must retain its non-sandboxed app entitlements"; assert "app.rxlab.finetext-spki" in e.get("com.apple.security.temporary-exception.mach-lookup.global-name", []), "Missing Sparkle installer Mach lookup entitlement"'
