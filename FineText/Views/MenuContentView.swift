@@ -40,16 +40,16 @@ struct HomeView: View {
         Label("FineText", systemImage: "wand.and.sparkles")
           .font(.headline)
         Spacer()
-        IconButton("clock.arrow.circlepath", help: "History") { workspace.route = .history }
-        IconButton("gearshape", help: "Settings") {
+        IconButton("clock.arrow.circlepath", help: LocalizableKey.history.string) { workspace.route = .history }
+        IconButton("gearshape", help: LocalizableKey.settings.string) {
           NSApp.activate()
           openSettings()
         }
         Menu {
-          Button("Check for Updates…") { updater.checkForUpdates() }
+          Button(LocalizableKey.checkForUpdates.string) { updater.checkForUpdates() }
             .disabled(!updater.isConfigured)
           Divider()
-          Button("Quit FineText") { NSApp.terminate(nil) }
+          Button(LocalizableKey.quitFinetext.string) { NSApp.terminate(nil) }
         } label: {
           Image(systemName: "ellipsis.circle")
         }
@@ -66,7 +66,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 14) {
           OriginalEditor(confirmClear: $confirmClear)
           Picker("", selection: $workspace.tab) {
-            ForEach(WorkTab.allCases) { Text($0.rawValue).tag($0) }
+            ForEach(WorkTab.allCases) { Text($0.title).tag($0) }
           }
           .pickerStyle(.segmented)
           .labelsHidden()
@@ -97,26 +97,26 @@ struct HomeView: View {
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
     }
-    .confirmationDialog("Clear this session?", isPresented: $confirmClear) {
-      Button("Clear", role: .destructive) { workspace.clear() }
+    .confirmationDialog(LocalizableKey.clearThisSession.string, isPresented: $confirmClear) {
+      Button(LocalizableKey.clear.string, role: .destructive) { workspace.clear() }
     } message: {
-      Text("Starts a new session. The current one stays in History.")
+      Text(LocalizableKey.startsANewSessionTheCurrentOneStaysInHistory.string)
     }
   }
 
   private var runTitle: String {
     switch workspace.tab {
-    case .rewrite: "Rewrite All"
-    case .translate: "Translate All"
-    case .image: "Generate All"
+    case .rewrite: LocalizableKey.rewriteAll.string
+    case .translate: LocalizableKey.translateAll.string
+    case .image: LocalizableKey.generateAll.string
     }
   }
 
   private var footerHint: String {
     switch workspace.tab {
-    case .rewrite: "\(workspace.session.rewrites.count) platform(s)"
-    case .translate: "\(workspace.session.translations.count) language(s)"
-    case .image: "\(workspace.session.images.count) image(s)"
+    case .rewrite: LocalizableKey.platformCount.format(workspace.session.rewrites.count)
+    case .translate: LocalizableKey.languageCount.format(workspace.session.translations.count)
+    case .image: LocalizableKey.imageCount.format(workspace.session.images.count)
     }
   }
 }
@@ -129,16 +129,16 @@ struct OriginalEditor: View {
     @Bindable var workspace = workspace
     VStack(alignment: .leading, spacing: 6) {
       HStack {
-        Text("Original post").font(.subheadline.weight(.semibold))
+        Text(LocalizableKey.originalPost.string).font(.subheadline.weight(.semibold))
         Spacer()
-        Button("Paste") {
+        Button(LocalizableKey.paste.string) {
           if let text = NSPasteboard.general.string(forType: .string) {
             workspace.originalText = text
             Haptics.tap()
           }
         }
         .buttonStyle(.borderless)
-        Button("Clear", role: .destructive) { confirmClear = true }
+        Button(LocalizableKey.clear.string, role: .destructive) { confirmClear = true }
           .buttonStyle(.borderless)
           .disabled(workspace.session.isEmpty)
       }
@@ -148,7 +148,7 @@ struct OriginalEditor: View {
           .scrollContentBackground(.hidden)
           .padding(6)
         if workspace.originalText.isEmpty {
-          Text("Paste or type the post you want to refine…")
+          Text(LocalizableKey.pasteOrTypeThePostYouWantToRefine.string)
             .foregroundStyle(.tertiary)
             .padding(.horizontal, 11)
             .padding(.vertical, 6)
@@ -158,7 +158,7 @@ struct OriginalEditor: View {
       .frame(height: 130)
       .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
       .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
-      Text("\(workspace.originalText.count) characters")
+      Text(LocalizableKey.characterCount.format(workspace.originalText.count))
         .font(.caption2).foregroundStyle(.secondary)
     }
   }
@@ -171,12 +171,20 @@ struct RewriteSection: View {
   @Environment(Preferences.self) private var preferences
   @Environment(ProviderStore.self) private var providers
 
+  @State private var showCustomPlatforms = false
+
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       Menu {
-        if let platform = preferences.lastPlatform, let model = preferences.lastModel(.rewrite), providers.provider(model.providerID) != nil {
-          Button("Again: \(platform.title) · \(providers.displayName(model))") {
+        if let platform = preferences.lastPlatform, let model = preferences.lastModel(.rewrite), providers.isAvailable(model) {
+          Button(LocalizableKey.again.format(platform.title, providers.displayName(model))) {
             workspace.addRewrite(platform: platform, model: model)
+          }
+          Divider()
+        }
+        if let platform = preferences.lastCustomPlatform, let model = preferences.lastModel(.rewrite), providers.isAvailable(model) {
+          Button(LocalizableKey.again.format(platform.name, providers.displayName(model))) {
+            workspace.addRewrite(customPlatform: platform, model: model)
           }
           Divider()
         }
@@ -191,18 +199,33 @@ struct RewriteSection: View {
             }
           }
         }
+        if !preferences.customPlatforms.isEmpty {
+          Divider()
+          ForEach(preferences.customPlatforms) { platform in
+            Menu(platform.name) {
+              ModelMenuItems(kind: .text, purpose: .rewrite) {
+                workspace.addRewrite(customPlatform: platform, model: $0)
+              }
+            }
+          }
+        }
+        Divider()
+        Button(LocalizableKey.customPlatforms.string, systemImage: "slider.horizontal.3") {
+          Haptics.tap()
+          showCustomPlatforms = true
+        }
       } label: {
-        Label("Add Platform", systemImage: "plus.circle.fill")
+        Label(LocalizableKey.addPlatform.string, systemImage: "plus.circle.fill")
       }
       .fixedSize()
 
       if workspace.session.rewrites.isEmpty {
-        EmptyHint(symbol: "text.badge.plus", text: "Add a platform, pick a model, then rewrite.")
+        EmptyHint(symbol: "text.badge.plus", text: LocalizableKey.addAPlatformPickAModelThenRewrite.string)
       }
       ForEach(workspace.session.sortedRewrites) { item in
         JobCard(
-          symbol: item.platform.symbol,
-          title: "\(item.platform.title) · \(item.tone.title)",
+          symbol: item.platformSymbol,
+          title: "\(item.platformTitle) · \(item.tone.title)",
           subtitle: providers.displayName(item.model),
           status: workspace.status(item.id),
           preview: item.output,
@@ -214,6 +237,7 @@ struct RewriteSection: View {
         )
       }
     }
+    .sheet(isPresented: $showCustomPlatforms) { CustomPlatformsSheet() }
   }
 }
 
@@ -227,8 +251,8 @@ struct TranslateSection: View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
         Menu {
-          if let language = preferences.lastLanguage, let model = preferences.lastModel(.translate), providers.provider(model.providerID) != nil {
-            Button("Again: \(language.name) · \(providers.displayName(model))") {
+          if let language = preferences.lastLanguage, let model = preferences.lastModel(.translate), providers.isAvailable(model) {
+            Button(LocalizableKey.again.format(language.localizedName, providers.displayName(model))) {
               workspace.addTranslation(language: language, model: model, source: validSource)
             }
             Divider()
@@ -240,33 +264,33 @@ struct TranslateSection: View {
               }
             } label: {
               if language == preferences.lastLanguage {
-                Label(language.name, systemImage: "checkmark")
+                Label(language.localizedName, systemImage: "checkmark")
               } else {
-                Text(language.name)
+                Text(language.localizedName)
               }
             }
           }
         } label: {
-          Label("Add Language", systemImage: "plus.circle.fill")
+          Label(LocalizableKey.addLanguage.string, systemImage: "plus.circle.fill")
         }
         .fixedSize()
         Spacer()
-        Picker("From", selection: $source) {
-          Text("Original").tag(UUID?.none)
+        Picker(LocalizableKey.from.string, selection: $source) {
+          Text(LocalizableKey.original.string).tag(UUID?.none)
           ForEach(workspace.session.sortedRewrites.filter { !$0.output.isEmpty }) { rewrite in
-            Text("\(rewrite.platform.title) · \(rewrite.tone.title)").tag(UUID?.some(rewrite.id))
+            Text("\(rewrite.platformTitle) · \(rewrite.tone.title)").tag(UUID?.some(rewrite.id))
           }
         }
         .fixedSize()
       }
 
       if workspace.session.translations.isEmpty {
-        EmptyHint(symbol: "globe", text: "Add a language to translate the original or a rewrite.")
+        EmptyHint(symbol: "globe", text: LocalizableKey.addALanguageToTranslateTheOriginalOrARewrite.string)
       }
       ForEach(workspace.session.sortedTranslations) { item in
         JobCard(
           symbol: "globe",
-          title: "\(item.language.name) · from \(workspace.sourceTitle(for: item))",
+          title: LocalizableKey.translationSource.format(item.language.localizedName, workspace.sourceTitle(for: item)),
           subtitle: providers.displayName(item.model),
           status: workspace.status(item.id),
           preview: item.output,
@@ -298,12 +322,12 @@ struct ImageSection: View {
           workspace.route = .image(item.id)
         }
       } label: {
-        Label("Add Image", systemImage: "plus.circle.fill")
+        Label(LocalizableKey.addImage.string, systemImage: "plus.circle.fill")
       }
       .fixedSize()
 
       if workspace.session.images.isEmpty {
-        EmptyHint(symbol: "photo.badge.plus", text: "Pick an image model, add optional art direction, then generate.")
+        EmptyHint(symbol: "photo.badge.plus", text: LocalizableKey.pickAnImageModelAddOptionalArtDirectionThenGenerate.string)
       }
       ForEach(workspace.session.sortedImages) { item in
         ImageCard(item: item)
@@ -335,19 +359,23 @@ struct ImageCard: View {
 
       VStack(alignment: .leading, spacing: 4) {
         Text(providers.displayName(item.model)).font(.subheadline.weight(.semibold)).lineLimit(1)
-        Text(item.instruction.isEmpty ? "No art direction · \(item.size.title)" : item.instruction)
+        Text(item.instruction.isEmpty ? LocalizableKey.noArtDirection.format(item.size.title) : item.instruction)
           .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        if item.transparentBackground {
+          Label(LocalizableKey.transparent.string, systemImage: "checkerboard.rectangle")
+            .font(.caption2).foregroundStyle(.secondary)
+        }
         StatusLine(status: status)
       }
       Spacer(minLength: 0)
       VStack(spacing: 6) {
         if status.isRunning {
-          IconButton("stop.circle", help: "Stop") { workspace.stop(item.id) }
+          IconButton("stop.circle", help: LocalizableKey.stop.string) { workspace.stop(item.id) }
         } else {
-          IconButton("sparkles", help: "Generate") { workspace.run(item) }
+          IconButton("sparkles", help: LocalizableKey.generate.string) { workspace.run(item) }
         }
         if item.imageData != nil {
-          IconButton("doc.on.doc", help: "Copy image") { workspace.copyImage(item) }
+          IconButton("doc.on.doc", help: LocalizableKey.copyImage.string) { workspace.copyImage(item) }
         }
       }
     }
@@ -382,12 +410,12 @@ struct JobCard: View {
         }
         Spacer()
         if status.isRunning {
-          IconButton("stop.circle", help: "Stop", action: onStop)
+          IconButton("stop.circle", help: LocalizableKey.stop.string, action: onStop)
         } else {
-          IconButton(preview.isEmpty ? "sparkles" : "arrow.clockwise", help: preview.isEmpty ? "Run" : "Regenerate", action: onRun)
+          IconButton(preview.isEmpty ? "sparkles" : "arrow.clockwise", help: preview.isEmpty ? LocalizableKey.run.string : LocalizableKey.regenerate.string, action: onRun)
         }
-        IconButton("doc.on.doc", help: "Copy", action: onCopy).disabled(preview.isEmpty)
-        IconButton("chevron.right", help: "Open", action: onOpen)
+        IconButton("doc.on.doc", help: LocalizableKey.copy.string, action: onCopy).disabled(preview.isEmpty)
+        IconButton("chevron.right", help: LocalizableKey.open.string, action: onOpen)
       }
       StatusLine(status: status)
       if !preview.isEmpty {
@@ -491,10 +519,13 @@ struct ModelMenuItems: View {
   let onPick: (ModelRef) -> Void
 
   var body: some View {
-    if providers.providers.isEmpty {
-      Button("Add a Provider in Settings…") {
+    if !providers.hasSources(for: kind) {
+      Button(LocalizableKey.addAProviderInSettings.string) {
         NSApp.activate()
         openSettings()
+      }
+      if kind == .text {
+        Button(LocalizableKey.downloadModelFromHub.string, action: openLocalModels)
       }
     } else {
       let last = preferences.lastModel(purpose)
@@ -502,18 +533,35 @@ struct ModelMenuItems: View {
         providers.models(for: ref.providerID, kind: kind).contains { $0.id == ref.modelID }
       }
       if !recent.isEmpty {
-        Section("Recent") {
+        Section(LocalizableKey.recent.string) {
           ForEach(recent, id: \.self) { ref in
             pickButton(providers.displayName(ref), ref: ref, selected: ref == last)
           }
+        }
+      }
+      if providers.codex != nil {
+        let ref = kind == .image ? ProviderStore.codexImageRef : ProviderStore.codexTextRef
+        Section(LocalizableKey.local.string) {
+          pickButton("Codex", ref: ref, selected: ref == last)
+        }
+      }
+      if kind == .text {
+        let local = providers.models(for: Provider.localID, kind: .text)
+        Menu(Provider.localName) {
+          ForEach(local) { model in
+            let ref = ModelRef(providerID: Provider.localID, modelID: model.id)
+            pickButton(model.id, ref: ref, selected: ref == last)
+          }
+          if !local.isEmpty { Divider() }
+          Button(LocalizableKey.downloadFromHub.string, action: openLocalModels)
         }
       }
       ForEach(providers.providers) { provider in
         let models = providers.models(for: provider.id, kind: kind)
         Menu(provider.name) {
           if models.isEmpty {
-            Text(providers.loading.contains(provider.id) ? "Loading models…" : "No \(kind.rawValue) models found")
-            Button("Refresh Models") { Task { await providers.refresh(provider.id) } }
+            Text(providers.loading.contains(provider.id) ? LocalizableKey.loadingModels.string : LocalizableKey.noModels.format(kind == .text ? LocalizableKey.textModels.string : LocalizableKey.imageModels.string))
+            Button(LocalizableKey.refreshModels.string) { Task { await providers.refresh(provider.id) } }
           }
           ForEach(models) { model in
             let ref = ModelRef(providerID: provider.id, modelID: model.id)
@@ -522,6 +570,13 @@ struct ModelMenuItems: View {
         }
       }
     }
+  }
+
+  /// Opens Settings on the Local Models tab.
+  private func openLocalModels() {
+    UserDefaults.standard.set(SettingsTab.local.rawValue, forKey: DefaultsKey.settingsTab)
+    NSApp.activate()
+    openSettings()
   }
 
   @ViewBuilder private func pickButton(_ title: String, ref: ModelRef, selected: Bool) -> some View {

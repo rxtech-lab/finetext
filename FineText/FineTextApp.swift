@@ -38,6 +38,7 @@ import SwiftUI
     Settings {
       SettingsView()
         .environment(providers)
+        .environment(providers.local)
         .environment(preferences)
         .environment(gemma)
         .environment(updater)

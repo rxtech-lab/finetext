@@ -41,10 +41,23 @@ enum Keychain {
   private(set) var models: [UUID: [RemoteModel]] = [:]
   private(set) var loading: Set<UUID> = []
   private(set) var errors: [UUID: String] = [:]
+  /// MLX models downloaded from Hugging Face; exposed as the "On This Mac" provider.
+  let local = LocalModelStore()
+  /// Local Codex CLI, used as a built-in text and image provider through `codex app-server`.
+  private(set) var codex: CodexInstall?
+  private(set) var detectingCodex = false
+
+  static let codexProvider = Provider(id: UUID(uuidString: "C0DE0000-0000-4000-8000-00000000C0DE")!, name: "Codex", baseURL: "")
+  static let codexImageModel = RemoteModel(id: "codex-image", generatesImages: true, generatesText: false)
+  static let codexImageRef = ModelRef(providerID: codexProvider.id, modelID: codexImageModel.id)
+  /// Uses whichever model is the default in the user's Codex config.
+  static let codexTextModel = RemoteModel(id: "codex-text", generatesImages: false, generatesText: true)
+  static let codexTextRef = ModelRef(providerID: codexProvider.id, modelID: codexTextModel.id)
 
   static let presets: [Provider] = [
     Provider(name: "OpenAI", baseURL: "https://api.openai.com/v1"),
     Provider(name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1"),
+    Provider(name: "Vercel AI Gateway", baseURL: "https://ai-gateway.vercel.sh/v1"),
     Provider(name: "Ollama", baseURL: "http://localhost:11434/v1"),
     Provider(name: "LM Studio", baseURL: "http://localhost:1234/v1"),
   ]
@@ -58,6 +71,21 @@ enum Keychain {
       models = cache
     }
     Task { await refreshAll() }
+    Task { await detectCodex() }
+  }
+
+  func detectCodex() async {
+    guard !detectingCodex else { return }
+    detectingCodex = true
+    codex = await CodexLocator.locate()
+    detectingCodex = false
+  }
+
+  func isCodex(_ ref: ModelRef) -> Bool { ref.providerID == Self.codexProvider.id }
+
+  /// True when at least one source can serve this kind of model (user providers, Codex, or local MLX models for text).
+  func hasSources(for kind: ModelKind) -> Bool {
+    !providers.isEmpty || codex != nil || (kind == .text && !local.models.isEmpty)
   }
 
   private func persist() {
@@ -66,7 +94,10 @@ enum Keychain {
     defaults.set(try? JSONEncoder().encode(models), forKey: DefaultsKey.modelCache)
   }
 
-  func provider(_ id: UUID) -> Provider? { providers.first { $0.id == id } }
+  func provider(_ id: UUID) -> Provider? {
+    if id == Self.codexProvider.id { return codex == nil ? nil : Self.codexProvider }
+    return providers.first { $0.id == id }
+  }
   func apiKey(for id: UUID) -> String { Keychain.get(account: id.uuidString) }
 
   func save(_ provider: Provider, apiKey: String) {
@@ -88,9 +119,14 @@ enum Keychain {
     persist()
   }
 
+  /// Whether a saved model reference can still run (its provider exists or the local model is downloaded).
+  func isAvailable(_ ref: ModelRef) -> Bool {
+    ref.isLocal ? local.isInstalled(ref.modelID) : provider(ref.providerID) != nil
+  }
+
   func client(for ref: ModelRef) throws -> OpenAIClient {
     guard let provider = provider(ref.providerID) else {
-      throw APIError.http(0, "The provider for \(ref.modelID) was removed. Pick another model.")
+      throw APIError.http(0, LocalizableKey.providerRemoved.format(ref.modelID))
     }
     return try OpenAIClient(baseURL: provider.baseURL, apiKey: apiKey(for: provider.id))
   }
@@ -116,11 +152,20 @@ enum Keychain {
   }
 
   func models(for id: UUID, kind: ModelKind) -> [RemoteModel] {
-    (models[id] ?? []).filter { kind == .image ? $0.generatesImages : $0.generatesText }
+    if id == Self.codexProvider.id {
+      guard codex != nil else { return [] }
+      return [kind == .image ? Self.codexImageModel : Self.codexTextModel]
+    }
+    if id == Provider.localID {
+      return kind == .text ? local.models.map { RemoteModel(id: $0.id, generatesImages: false, generatesText: true) } : []
+    }
+    return (models[id] ?? []).filter { kind == .image ? $0.generatesImages : $0.generatesText }
   }
 
   func displayName(_ ref: ModelRef) -> String {
+    if isCodex(ref) { return "Codex" }
     let name = ref.modelID.split(separator: "/").last.map(String.init) ?? ref.modelID
+    if ref.isLocal { return "\(name) · \(Provider.localName)" }
     guard providers.count > 1, let provider = provider(ref.providerID) else { return name }
     return "\(name) · \(provider.name)"
   }
@@ -130,6 +175,8 @@ enum Keychain {
 
 @MainActor @Observable final class Preferences {
   struct Stored: Codable {
+    var customPlatforms: [CustomPlatform]?
+    var lastCustomPlatformID: UUID?
     var lastPlatform: Platform?
     var lastLanguage: String?
     var lastModels: [String: ModelRef] = [:]
@@ -151,7 +198,43 @@ enum Keychain {
 
   enum Purpose: String { case rewrite, translate, image }
 
+  var customPlatforms: [CustomPlatform] { stored.customPlatforms ?? [] }
+  var lastCustomPlatform: CustomPlatform? { customPlatforms.first { $0.id == stored.lastCustomPlatformID } }
   var lastPlatform: Platform? { stored.lastPlatform }
+
+  func saveCustomPlatform(_ platform: CustomPlatform) {
+    var platforms = customPlatforms
+    var clean = platform
+    clean.name = clean.name.trimmed
+    clean.instruction = clean.instruction.trimmed
+    guard !clean.name.isEmpty, !clean.instruction.isEmpty else { return }
+    if let index = platforms.firstIndex(where: { $0.id == clean.id }) {
+      platforms[index] = clean
+    } else {
+      platforms.append(clean)
+    }
+    stored.customPlatforms = platforms
+  }
+
+  func deleteCustomPlatform(_ id: UUID) {
+    stored.customPlatforms = customPlatforms.filter { $0.id != id }
+    stored.tones["custom-" + id.uuidString] = nil
+    if stored.lastCustomPlatformID == id { stored.lastCustomPlatformID = nil }
+  }
+
+  func remember(customPlatform: CustomPlatform) {
+    stored.lastPlatform = nil
+    stored.lastCustomPlatformID = customPlatform.id
+  }
+
+  func tone(for item: RewriteItem) -> Tone {
+    stored.tones[item.customPlatformID.map { "custom-" + $0.uuidString } ?? item.platformRaw]
+      ?? (item.isCustomPlatform ? .natural : item.platform.defaultTone)
+  }
+
+  func setTone(_ tone: Tone, for item: RewriteItem) {
+    stored.tones[item.customPlatformID.map { "custom-" + $0.uuidString } ?? item.platformRaw] = tone
+  }
   var lastLanguage: Language? { stored.lastLanguage.map(Language.named(code:)) }
   func lastModel(_ purpose: Purpose) -> ModelRef? { stored.lastModels[purpose.rawValue] }
   func recentModels(_ purpose: Purpose) -> [ModelRef] { stored.recentModels[purpose.rawValue] ?? [] }
@@ -165,7 +248,10 @@ enum Keychain {
     stored.recentModels[purpose.rawValue] = Array(recent.prefix(4))
   }
 
-  func remember(platform: Platform) { stored.lastPlatform = platform }
+  func remember(platform: Platform) {
+    stored.lastPlatform = platform
+    stored.lastCustomPlatformID = nil
+  }
   func remember(language: Language) { stored.lastLanguage = language.code }
   func setTone(_ tone: Tone, for platform: Platform) { stored.tones[platform.rawValue] = tone }
 }

@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Platforms & tones
 
 enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
-  case x, reddit, linkedin, blog
+  case x, reddit, linkedin, blog, message
 
   var id: String { rawValue }
 
@@ -12,7 +12,17 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .x: "X"
     case .reddit: "Reddit"
     case .linkedin: "LinkedIn"
+    case .blog: LocalizableKey.blogPost.string
+    case .message: LocalizableKey.message.string
+    }
+  }
+
+  /// Stable English label used in model instructions.
+  var promptTitle: String {
+    switch self {
     case .blog: "Blog Post"
+    case .message: "Message"
+    default: title
     }
   }
 
@@ -22,6 +32,7 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .reddit: "bubble.left.and.bubble.right"
     case .linkedin: "briefcase"
     case .blog: "doc.richtext"
+    case .message: "message"
     }
   }
 
@@ -31,6 +42,7 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .reddit: .casual
     case .linkedin: .professional
     case .blog: .storytelling
+    case .message: .natural
     }
   }
 
@@ -63,18 +75,51 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
       - Around 400-900 words, expanding on the original with useful detail but no invented facts.
       - Clear, readable paragraphs.
       """
+    case .message:
+      """
+      - A chat message for a messaging app (iMessage, WhatsApp, Telegram, Slack DMs), written the way a real \
+      person texts the people they know.
+      - Natural and spoken: contractions, everyday words, short sentences. It should sound like the author \
+      would say it out loud. Sentence fragments are fine.
+      - No title, no hashtags, no Markdown, no bullet lists, no sign-off or formal greeting, no "I hope this \
+      message finds you well".
+      - Keep it short. Break longer content into a few short lines or paragraphs instead of one block.
+      - Don't sound like an announcement, an email or marketing copy. Only use an emoji if it fits naturally.
+      """
     }
   }
 }
 
+/// Reusable rewrite rules. IDs remain stable when the user renames a preset.
+struct CustomPlatform: Codable, Identifiable, Hashable, Sendable {
+  var id = UUID()
+  var name: String
+  var instruction: String
+}
+
 enum Tone: String, CaseIterable, Codable, Identifiable, Sendable {
-  case professional, casual, witty, friendly, enthusiastic, informative, storytelling, bold, concise, empathetic
+  case natural, professional, casual, witty, friendly, enthusiastic, informative, storytelling, bold, concise, empathetic
 
   var id: String { rawValue }
-  var title: String { rawValue.capitalized }
+  var title: String {
+    switch self {
+    case .natural: LocalizableKey.natural.string
+    case .professional: LocalizableKey.professional.string
+    case .casual: LocalizableKey.casual.string
+    case .witty: LocalizableKey.witty.string
+    case .friendly: LocalizableKey.friendly.string
+    case .enthusiastic: LocalizableKey.enthusiastic.string
+    case .informative: LocalizableKey.informative.string
+    case .storytelling: LocalizableKey.storytelling.string
+    case .bold: LocalizableKey.bold.string
+    case .concise: LocalizableKey.concise.string
+    case .empathetic: LocalizableKey.empathetic.string
+    }
+  }
 
   var guidance: String {
     switch self {
+    case .natural: "how the author would actually say it in person: plain words, relaxed rhythm, nothing performative"
     case .professional: "polished, credible and confident without jargon"
     case .casual: "relaxed and conversational, like talking to a friend"
     case .witty: "clever and playful with light humor, never cringe"
@@ -95,6 +140,12 @@ struct Language: Hashable, Codable, Identifiable, Sendable {
   let code: String
   let name: String
   var id: String { code }
+
+  /// Localized display name; `name` stays stable for Codable and model prompts.
+  var localizedName: String {
+    Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+      .localizedString(forIdentifier: code) ?? name
+  }
 
   static let english = Language(code: "en", name: "English")
   static let japanese = Language(code: "ja", name: "Japanese")
@@ -135,11 +186,17 @@ struct Provider: Codable, Identifiable, Hashable, Sendable {
   var id = UUID()
   var name: String
   var baseURL: String
+
+  /// Pseudo provider id for MLX models downloaded from Hugging Face and run on this Mac.
+  static let localID = UUID(uuidString: "00000000-0000-0000-0000-00000000F17E")!
+  static var localName: String { LocalizableKey.onThisMac.string }
 }
 
 struct ModelRef: Codable, Hashable, Sendable {
   let providerID: UUID
   let modelID: String
+
+  var isLocal: Bool { providerID == Provider.localID }
 }
 
 enum ModelKind: String, Sendable {
@@ -166,7 +223,13 @@ enum JobStatus: Equatable, Sendable {
 enum ImageSize: String, CaseIterable, Identifiable, Sendable {
   case square, landscape, portrait
   var id: String { rawValue }
-  var title: String { rawValue.capitalized }
+  var title: String {
+    switch self {
+    case .square: LocalizableKey.square.string
+    case .landscape: LocalizableKey.landscape.string
+    case .portrait: LocalizableKey.portrait.string
+    }
+  }
 
   func value(for modelID: String) -> String {
     let dalle3 = modelID.lowercased().contains("dall-e-3")
@@ -183,19 +246,19 @@ enum ImageSize: String, CaseIterable, Identifiable, Sendable {
 enum DefaultsKey {
   static let humanizeRounds = "humanizeRounds"
   static let pivotLanguage = "pivotLanguage"
-  static let ollamaURL = "ollamaURL"
-  static let gemmaModel = "translateGemmaModel"
+  static let gemmaModel = "translateGemmaMLXModel"
   static let draft = "draftText"
   static let providers = "providers"
   static let modelCache = "modelCache"
   static let preferences = "preferences"
+  static let localModels = "localModels"
+  static let settingsTab = "settingsTab"
 
   static func register() {
     UserDefaults.standard.register(defaults: [
       humanizeRounds: 3,
       pivotLanguage: Language.japanese.code,
-      ollamaURL: "http://localhost:11434",
-      gemmaModel: "translategemma:4b",
+      gemmaModel: TranslateGemmaModel.default.id,
     ])
   }
 }
