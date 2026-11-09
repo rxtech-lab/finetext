@@ -372,3 +372,25 @@
 "detectorModelReady" = "Detector model downloaded and ready";
 
 "refinementChangeLegend" = "Added text: green. Deleted text: red with a strike-through. Moved text: blue.";
+
+"searchHistory" = "Search history";
+"noHistoryResults" = "No matching sessions";
+"summarizingHistory" = "Summarizing history…";
+"historyLoadFailed" = "Could not load history. Please try again.";
+"today" = "Today";
+"yesterday" = "Yesterday";
+
+"costUnavailable" = "Cost unavailable";
+"costTrackingHint" = "Recorded USD costs include regenerations, translations and history titles. ≈ means an estimate from provider pricing. Unpriced requests and older activity are excluded; subscription fees and local compute are excluded.";
+"usageCosts" = "Usage & costs";
+"currentSession" = "This session";
+"allTime" = "All time";
+"recordedTotal" = "Recorded total (USD)";
+"recordedCost" = "Recorded cost (USD)";
+"unpricedRequests" = "%d requests have no USD price. The total is incomplete.";
+"noRecordedCosts" = "No recorded costs yet";
+"historyTitle" = "History title";
+
+"chatVariant" = "Chat";
+
+"newThread" = "New thread";

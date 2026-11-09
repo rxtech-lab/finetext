@@ -101,9 +101,10 @@ struct RewriteDetailView: View {
             item.model = $0
             preferences.remember($0, for: .rewrite)
           }
+          LabeledContent(LocalizableKey.recordedCost.string) { CostLabel(summary: workspace.cost(for: item.id)) }
           StatusLine(status: status)
           if let note = item.note {
-            Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.orange)
+            Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
           }
           RefinementResultView(
             original: item.refinementSource ?? workspace.originalText,
@@ -151,6 +152,7 @@ struct TranslationDetailView: View {
             item.model = $0
             preferences.remember($0, for: .translate)
           }
+          LabeledContent(LocalizableKey.recordedCost.string) { CostLabel(summary: workspace.cost(for: item.id)) }
           StatusLine(status: status)
           OutputEditor(text: $item.output)
         }
@@ -206,6 +208,7 @@ struct ImageDetailView: View {
           TextField(LocalizableKey.artDirectionOptionalEGFlatIllustrationWarmColors.string, text: $item.instruction, axis: .vertical)
             .lineLimit(2...4)
             .textFieldStyle(.roundedBorder)
+          LabeledContent(LocalizableKey.recordedCost.string) { CostLabel(summary: workspace.cost(for: item.id)) }
           StatusLine(status: status)
           ZStack {
             RoundedRectangle(cornerRadius: 10).fill(.background.secondary)
@@ -375,57 +378,152 @@ struct MissingItemView: View {
 
 struct HistoryView: View {
   @Environment(Workspace.self) private var workspace
-  @Query(sort: \RefinementSession.updatedAt, order: .reverse) private var sessions: [RefinementSession]
+  @State private var sessions: [RefinementSession] = []
   @State private var pendingDelete: RefinementSession?
+  @State private var searchText = ""
+  @State private var showingSearch = false
+  @State private var appliedSearchText = ""
+  @State private var hasMore = true
+  @State private var isLoading = false
+  @State private var isSummarizing = false
+  @State private var loadFailed = false
+  @FocusState private var searchFocused: Bool
+
+  private var groups: [(date: Date, sessions: [RefinementSession])] {
+    let grouped = Dictionary(grouping: sessions) { Calendar.current.startOfDay(for: $0.updatedAt) }
+    return grouped.keys.sorted(by: >).map { ($0, grouped[$0] ?? []) }
+  }
 
   var body: some View {
     VStack(spacing: 0) {
-      PageHeader(title: LocalizableKey.history.string) { EmptyView() }
+      PageHeader(title: LocalizableKey.history.string) {
+        IconButton(showingSearch ? "xmark" : "magnifyingglass", help: LocalizableKey.searchHistory.string) {
+          showingSearch.toggle()
+          if showingSearch { searchFocused = true } else { searchText = "" }
+        }
+      }
+      if showingSearch {
+        TextField(LocalizableKey.searchHistory.string, text: $searchText)
+          .textFieldStyle(.roundedBorder)
+          .focused($searchFocused)
+          .padding(.horizontal, 14).padding(.bottom, 10)
+      }
       Divider()
-      let visible = sessions.filter { !$0.isEmpty }
-      if visible.isEmpty {
-        ContentUnavailableView(LocalizableKey.noSessionsYet.string, systemImage: "clock", description: Text(LocalizableKey.yourRefinementsAreSavedHereAutomatically.string))
+      if sessions.isEmpty && !isLoading && !loadFailed {
+        ContentUnavailableView(
+          searchText.trimmed.isEmpty ? LocalizableKey.noSessionsYet.string : LocalizableKey.noHistoryResults.string,
+          systemImage: searchText.trimmed.isEmpty ? "clock" : "magnifyingglass",
+          description: Text(LocalizableKey.yourRefinementsAreSavedHereAutomatically.string))
           .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
-        List(visible) { session in
-          Button {
-            workspace.open(session)
-          } label: {
-            VStack(alignment: .leading, spacing: 3) {
-              HStack {
-                Text(session.title).font(.subheadline.weight(.semibold)).lineLimit(1)
-                if session.id == workspace.session.id {
-                  Text(LocalizableKey.current.string).font(.caption2.weight(.semibold)).padding(.horizontal, 6).padding(.vertical, 1)
-                    .background(.tint.opacity(0.2), in: Capsule())
-                }
-              }
-              Text(LocalizableKey.sessionCounts.format(session.rewrites.count, session.translations.count, session.images.count))
-                .font(.caption).foregroundStyle(.secondary)
-              Text(session.updatedAt, format: .relative(presentation: .named))
-                .font(.caption2).foregroundStyle(.tertiary)
+        List {
+          ForEach(groups, id: \.date) { group in
+            Section {
+              ForEach(group.sessions) { session in historyRow(session) }
+            } header: {
+              Text(dateLabel(group.date))
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
           }
-          .buttonStyle(.plain)
-          .contextMenu {
-            Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session }
+          if hasMore {
+            ProgressView().frame(maxWidth: .infinity).id(sessions.count)
+              .onAppear { loadPage() }
           }
-          .swipeActions {
-            Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session }
+          if loadFailed {
+            Button(LocalizableKey.retry.string) { hasMore = true; loadPage() }
+              .frame(maxWidth: .infinity)
           }
         }
         .listStyle(.inset)
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    .overlay(alignment: .bottom) {
+      if isSummarizing {
+        HStack(spacing: 8) {
+          ProgressView().controlSize(.small)
+          Text(LocalizableKey.summarizingHistory.string).font(.caption)
+        }
+        .padding(10).background(.regularMaterial, in: Capsule()).padding(12)
+        .allowsHitTesting(false)
+      }
+    }
+    .task(id: searchText) {
+      if !searchText.isEmpty {
+        do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+      }
+      appliedSearchText = searchText
+      sessions = []
+      hasMore = true
+      loadPage()
+    }
+    .task(id: sessions.map(\.id)) {
+      for session in sessions {
+        guard !Task.isCancelled else { return }
+        isSummarizing = true
+        await workspace.summarizeTitle(for: session)
+        isSummarizing = false
+      }
+    }
     .confirmationDialog(LocalizableKey.deleteThisSession.string, isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })) {
       Button(LocalizableKey.delete.string, role: .destructive) {
-        if let pendingDelete { workspace.deleteSession(pendingDelete) }
+        if let pendingDelete {
+          workspace.deleteSession(pendingDelete)
+          sessions = []
+          hasMore = true
+          loadPage()
+        }
         pendingDelete = nil
       }
     } message: {
       Text(LocalizableKey.itsTextRewritesTranslationsAndImagesAreRemovedPermanently.string)
     }
+  }
+
+  private func dateLabel(_ date: Date) -> String {
+    if Calendar.current.isDateInToday(date) { return LocalizableKey.today.string }
+    if Calendar.current.isDateInYesterday(date) { return LocalizableKey.yesterday.string }
+    return date.formatted(date: .abbreviated, time: .omitted)
+  }
+
+  private func loadPage() {
+    guard !isLoading, hasMore, searchText == appliedSearchText else { return }
+    isLoading = true
+    defer { isLoading = false }
+    let query = appliedSearchText.trimmed
+    do {
+      let page = try HistoryStore.page(in: workspace.context, query: query, offset: sessions.count)
+      sessions.append(contentsOf: page)
+      hasMore = page.count == 20
+      loadFailed = false
+    } catch {
+      hasMore = false
+      loadFailed = true
+      workspace.flash(LocalizableKey.historyLoadFailed.string, symbol: "exclamationmark.triangle", isError: true)
+    }
+  }
+
+  private func historyRow(_ session: RefinementSession) -> some View {
+    Button {
+      workspace.open(session)
+    } label: {
+      VStack(alignment: .leading, spacing: 3) {
+        HStack {
+          Text(session.title).font(.subheadline.weight(.semibold)).lineLimit(1)
+          if session.id == workspace.session.id {
+            Text(LocalizableKey.current.string).font(.caption2.weight(.semibold)).padding(.horizontal, 6).padding(.vertical, 1)
+              .background(.tint.opacity(0.2), in: Capsule())
+          }
+        }
+        Text(LocalizableKey.sessionCounts.format(session.rewrites.count, session.translations.count, session.images.count))
+          .font(.caption).foregroundStyle(.secondary)
+        CostLabel(summary: workspace.sessionCost(session.id))
+        Text(session.updatedAt, format: .relative(presentation: .named))
+          .font(.caption2).foregroundStyle(.tertiary)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .contextMenu { Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session } }
+    .swipeActions { Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session } }
   }
 }

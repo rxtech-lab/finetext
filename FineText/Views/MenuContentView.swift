@@ -33,6 +33,7 @@ struct HomeView: View {
   @Environment(AppUpdater.self) private var updater
   @Environment(\.openSettings) private var openSettings
   @State private var confirmClear = false
+  @State private var showCosts = false
 
   var body: some View {
     @Bindable var workspace = workspace
@@ -41,6 +42,10 @@ struct HomeView: View {
         Label("FineText", systemImage: "wand.and.sparkles")
           .font(.headline)
         Spacer()
+        Button { showCosts = true } label: {
+          Label(workspace.sessionCost(workspace.session.id).totalLabel, systemImage: "dollarsign.circle")
+            .font(.caption).monospacedDigit()
+        }.buttonStyle(.borderless).help(LocalizableKey.usageCosts.string)
         IconButton("clock.arrow.circlepath", help: LocalizableKey.history.string) { workspace.route = .history }
         IconButton("gearshape", help: LocalizableKey.settings.string) {
           NSApp.activate()
@@ -98,11 +103,12 @@ struct HomeView: View {
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
     }
-    .confirmationDialog(LocalizableKey.clearThisSession.string, isPresented: $confirmClear) {
-      Button(LocalizableKey.clear.string, role: .destructive) { workspace.clear() }
+    .confirmationDialog(LocalizableKey.newThread.string, isPresented: $confirmClear) {
+      Button(LocalizableKey.newThread.string) { workspace.clear() }
     } message: {
       Text(LocalizableKey.startsANewSessionTheCurrentOneStaysInHistory.string)
     }
+    .sheet(isPresented: $showCosts) { CostsSheet() }
   }
 
   private var runTitle: String {
@@ -132,15 +138,13 @@ struct OriginalEditor: View {
       HStack {
         Text(LocalizableKey.originalPost.string).font(.subheadline.weight(.semibold))
         Spacer()
-        Button(LocalizableKey.paste.string) {
+        IconButton("doc.on.clipboard", help: LocalizableKey.paste.string) {
           if let text = NSPasteboard.general.string(forType: .string) {
             workspace.originalText = text
             Haptics.tap()
           }
         }
-        .buttonStyle(.borderless)
-        Button(LocalizableKey.clear.string, role: .destructive) { confirmClear = true }
-          .buttonStyle(.borderless)
+        IconButton("square.and.pencil", help: LocalizableKey.newThread.string) { confirmClear = true }
           .disabled(workspace.session.isEmpty)
       }
       ZStack(alignment: .topLeading) {
@@ -244,7 +248,7 @@ struct RewriteSection: View {
           subtitle: providers.displayName(item.model),
           status: workspace.status(item.id),
           preview: item.output,
-          note: item.note,
+          cost: workspace.cost(for: item.id),
           onRun: { workspace.run(item) },
           onStop: { workspace.stop(item.id) },
           onCopy: { workspace.copy(item.output) },
@@ -309,7 +313,7 @@ struct TranslateSection: View {
           subtitle: providers.displayName(item.model),
           status: workspace.status(item.id),
           preview: item.output,
-          note: nil,
+          cost: workspace.cost(for: item.id),
           onRun: { workspace.run(item) },
           onStop: { workspace.stop(item.id) },
           onCopy: { workspace.copy(item.output) },
@@ -380,6 +384,7 @@ struct ImageCard: View {
           Label(LocalizableKey.transparent.string, systemImage: "checkerboard.rectangle")
             .font(.caption2).foregroundStyle(.secondary)
         }
+        CostLabel(summary: workspace.cost(for: item.id))
         StatusLine(status: status)
       }
       Spacer(minLength: 0)
@@ -409,7 +414,7 @@ struct JobCard: View {
   let subtitle: String
   let status: JobStatus
   let preview: String
-  let note: String?
+  var cost: CostSummary
   let onRun: () -> Void
   let onStop: () -> Void
   let onCopy: () -> Void
@@ -422,6 +427,7 @@ struct JobCard: View {
         VStack(alignment: .leading, spacing: 1) {
           Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
           Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+          CostLabel(summary: cost)
         }
         Spacer()
         if status.isRunning {
@@ -436,9 +442,6 @@ struct JobCard: View {
       if !preview.isEmpty {
         Text(preview).font(.callout).lineLimit(4).foregroundStyle(.primary.opacity(0.85))
           .frame(maxWidth: .infinity, alignment: .leading)
-      }
-      if let note {
-        Label(note, systemImage: "info.circle").font(.caption2).foregroundStyle(.orange)
       }
     }
     .padding(10)
@@ -483,6 +486,7 @@ struct IconButton: View {
     }
     .buttonStyle(.borderless)
     .help(help)
+    .accessibilityLabel(help)
   }
 }
 

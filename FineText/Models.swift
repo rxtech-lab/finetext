@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Platforms & tones
 
 enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
-  case x, xReply, xThread, reddit, redditComment, linkedin, blog, message
+  case x, xReply, xThread, reddit, redditComment, linkedin, linkedinComment, linkedinChat, blog, message
 
   var id: String { rawValue }
 
@@ -11,7 +11,7 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     switch self {
     case .x, .xReply, .xThread: "X · \(variantTitle)"
     case .reddit, .redditComment: "Reddit · \(variantTitle)"
-    case .linkedin: "LinkedIn"
+    case .linkedin, .linkedinComment, .linkedinChat: "LinkedIn · \(variantTitle)"
     case .blog: LocalizableKey.blogPost.string
     case .message: LocalizableKey.message.string
     }
@@ -24,6 +24,7 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     switch self {
     case .x, .xReply, .xThread: [.x, .xReply, .xThread]
     case .reddit, .redditComment: [.reddit, .redditComment]
+    case .linkedin, .linkedinComment, .linkedinChat: [.linkedin, .linkedinComment, .linkedinChat]
     default: []
     }
   }
@@ -32,16 +33,18 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     switch self {
     case .x, .xReply, .xThread: "X"
     case .reddit, .redditComment: "Reddit"
+    case .linkedin, .linkedinComment, .linkedinChat: "LinkedIn"
     default: title
     }
   }
 
   var variantTitle: String {
     switch self {
-    case .x, .reddit: LocalizableKey.postVariant.string
+    case .x, .reddit, .linkedin: LocalizableKey.postVariant.string
     case .xReply: LocalizableKey.replyVariant.string
     case .xThread: LocalizableKey.threadVariant.string
-    case .redditComment: LocalizableKey.commentVariant.string
+    case .redditComment, .linkedinComment: LocalizableKey.commentVariant.string
+    case .linkedinChat: LocalizableKey.chatVariant.string
     default: title
     }
   }
@@ -54,9 +57,11 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .xThread: "X Thread"
     case .reddit: "Reddit Post"
     case .redditComment: "Reddit Comment"
+    case .linkedin: "LinkedIn Post"
+    case .linkedinComment: "LinkedIn Comment"
+    case .linkedinChat: "LinkedIn Chat"
     case .blog: "Blog Post"
     case .message: "Message"
-    default: title
     }
   }
 
@@ -65,6 +70,8 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .x, .xReply, .xThread: "xmark"
     case .reddit, .redditComment: "bubble.left.and.bubble.right"
     case .linkedin: "briefcase"
+    case .linkedinComment: "text.bubble"
+    case .linkedinChat: "message"
     case .blog: "doc.richtext"
     case .message: "message"
     }
@@ -75,6 +82,7 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
     case .x, .xReply, .xThread: .witty
     case .reddit, .redditComment: .casual
     case .linkedin: .professional
+    case .linkedinComment, .linkedinChat: .natural
     case .blog: .storytelling
     case .message: .natural
     }
@@ -127,6 +135,22 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
       - Open with a strong one-line hook, then short paragraphs of 1-3 sentences.
       - Share a takeaway or lesson; keep it credible and specific.
       - End with a light question or call to action and 3-5 hashtags on the last line.
+      """
+    case .linkedinComment:
+      """
+      - A comment on a LinkedIn post, not a standalone post: no title, opening hook, or hashtags.
+      - Keep it concise, thoughtful and conversational, with a professional but natural tone.
+      - Preserve the author's point and contribute something specific rather than generic praise.
+      - Do not invent facts, personal experiences, or context about the parent post.
+      - No promotional pitch or forced question at the end.
+      """
+    case .linkedinChat:
+      """
+      - A private LinkedIn chat message, not a public post or email.
+      - Use natural, concise language suitable for a professional conversation, with short paragraphs.
+      - Preserve the author's intent, relationship and level of familiarity; do not invent prior contact.
+      - No title, hashtags, public call to action, unsolicited sales pitch, or formal email sign-off.
+      - Avoid canned greetings and networking clichés. Keep any request direct and low-pressure.
       """
     case .blog:
       """
@@ -266,6 +290,7 @@ struct RemoteModel: Codable, Identifiable, Hashable, Sendable {
   let id: String
   let generatesImages: Bool
   let generatesText: Bool
+  var pricing: ModelPricing? = nil
 }
 
 // MARK: - Jobs
@@ -331,4 +356,68 @@ enum DefaultsKey {
 
 extension String {
   var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
+}
+
+/// Prices returned by a provider's model catalogue, in USD per token.
+struct ModelPricing: Codable, Hashable, Sendable {
+  var input: Double
+  var output: Double
+  var cachedInput: Double?
+}
+
+struct GenerationUsage: Sendable {
+  var inputTokens: Int?
+  var outputTokens: Int?
+  var cachedTokens: Int = 0
+  var costUSD: Double?
+
+  static func parse(_ json: [String: Any], isVercelGateway: Bool = false) -> GenerationUsage? {
+    let usage = json["usage"] as? [String: Any] ?? [:]
+    func number(_ value: Any?) -> Double? {
+      let result = (value as? NSNumber)?.doubleValue ?? (value as? String).flatMap(Double.init)
+      return result.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+    }
+    let metadata = (json["provider_metadata"] ?? json["providerMetadata"]) as? [String: Any]
+    let gateway = metadata?["gateway"] as? [String: Any]
+    let gatewayCost = number(gateway?["cost"])
+    var usageCost = number(usage["cost"]) ?? number(usage["total_cost_usd"])
+    // Gateway billing metadata is authoritative. A bare zero in compatibility usage
+    // is insufficient to price a paid model; use token pricing when available.
+    if isVercelGateway, usageCost == 0, gatewayCost == nil { usageCost = nil }
+    guard !usage.isEmpty || gatewayCost != nil else { return nil }
+    let details = (usage["prompt_tokens_details"] ?? usage["input_tokens_details"]) as? [String: Any]
+    return GenerationUsage(inputTokens: usage["prompt_tokens"] as? Int ?? usage["input_tokens"] as? Int,
+                           outputTokens: usage["completion_tokens"] as? Int ?? usage["output_tokens"] as? Int,
+                           cachedTokens: details?["cached_tokens"] as? Int ?? 0,
+                           costUSD: gatewayCost ?? usageCost)
+  }
+
+  func estimate(_ pricing: ModelPricing?) -> Double? {
+    guard let pricing, let inputTokens, let outputTokens, inputTokens >= 0, outputTokens >= 0,
+          pricing.input.isFinite, pricing.output.isFinite, pricing.input >= 0, pricing.output >= 0,
+          pricing.cachedInput.map({ $0.isFinite && $0 >= 0 }) ?? true else { return nil }
+    let cached = min(inputTokens, max(0, cachedTokens))
+    let value = Double(inputTokens - cached) * pricing.input + Double(cached) * (pricing.cachedInput ?? pricing.input)
+      + Double(outputTokens) * pricing.output
+    return value.isFinite && value >= 0 ? value : nil
+  }
+}
+
+struct CostSummary {
+  let charges: [GenerationCharge]
+  var total: Double { charges.compactMap(\.costUSD).reduce(0, +) }
+  var unknownCount: Int { charges.filter { $0.costUSD == nil }.count }
+  var hasEstimate: Bool { charges.contains { $0.estimated } }
+  var totalLabel: String { charges.isEmpty ? Self.usd(0) : label }
+  var label: String {
+    guard !charges.isEmpty else { return LocalizableKey.costUnavailable.string }
+    guard charges.contains(where: { $0.costUSD != nil }) else { return LocalizableKey.costUnavailable.string }
+    return (hasEstimate ? "≈ " : "") + Self.usd(total) + (unknownCount > 0 ? " + ?" : "")
+  }
+  static func usd(_ amount: Double) -> String {
+    if amount > 0, amount < 0.000001 {
+      return "< " + 0.000001.formatted(.currency(code: "USD").precision(.fractionLength(6)))
+    }
+    return amount.formatted(.currency(code: "USD").precision(.fractionLength(2...6)))
+  }
 }

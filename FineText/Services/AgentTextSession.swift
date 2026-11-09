@@ -25,6 +25,7 @@ enum AgentTextSession {
   static func chat(
     client: any AgentClient, messages: [ChatMessage], model: String?, status: String,
     onStatus: @MainActor @Sendable @escaping (String) -> Void,
+    onUsage: @MainActor @Sendable @escaping (GenerationUsage) -> Void = { _ in },
     onDelta: @MainActor @Sendable @escaping (String) -> Void
   ) async throws -> String {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("FineText-Agent-\(UUID())")
@@ -49,6 +50,9 @@ enum AgentTextSession {
       for await event in client.send(request) {
         try Task.checkCancellation()
         switch event {
+        case .usage(let usage), .messageEnded(_, let usage?):
+          await onUsage(GenerationUsage(inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
+                                       cachedTokens: usage.cacheReadTokens, costUSD: usage.totalCostUSD))
         case .textDelta(let delta):
           reply += delta
           await onDelta(delta)
@@ -57,6 +61,10 @@ enum AgentTextSession {
           throw APIError.http(0, error.description)
         case .turnEnded(let result):
           if result.isBackgroundFollowUp { continue }
+          if let usage = result.usage {
+            await onUsage(GenerationUsage(inputTokens: usage.inputTokens, outputTokens: usage.outputTokens,
+                                         cachedTokens: usage.cacheReadTokens, costUSD: usage.totalCostUSD))
+          }
           guard !result.isError else { throw APIError.http(0, LocalizableKey.requestFailed.string) }
           guard !reply.trimmed.isEmpty else { throw APIError.empty }
           return reply
