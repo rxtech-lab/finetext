@@ -10,7 +10,8 @@ with tempfile.TemporaryDirectory(prefix='finetext-history-costs-') as temporary:
     sources = [
         'FineText/Localization/LocalizableKey.swift', 'FineText/Models.swift',
         'FineText/Persistence.swift', 'FineText/Services/HistoryStore.swift',
-        'FineText/Services/OpenAIClient.swift', 'scripts/tests/HistoryCostsTests.swift',
+        'FineText/Services/OpenAIClient.swift', 'FineText/Services/GenerationUsage.swift',
+        'scripts/tests/HistoryCostsTests.swift',
     ]
     subprocess.run([
         'swiftc', '-swift-version', '6', '-strict-concurrency=complete',

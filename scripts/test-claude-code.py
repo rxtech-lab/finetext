@@ -26,7 +26,8 @@ let package = Package(name: "AdapterTests", platforms: [.macOS(.v26)],
     .product(name: "RxAgentSDK", package: "''' + identity + '''")])])
 ''')
     for relative in ['FineText/Services/AgentTextSession.swift', 'FineText/Services/ClaudeCode.swift',
-                     'FineText/Services/Codex.swift', 'FineText/Localization/LocalizableKey.swift',
+                     'FineText/Services/Codex.swift', 'FineText/Services/GenerationUsage.swift',
+                     'FineText/Localization/LocalizableKey.swift',
                      'scripts/tests/ClaudeCodeSessionTests.swift']:
         shutil.copy(root / relative, source)
     subprocess.run(['swift', 'run', '--package-path', str(package), 'AdapterTests'], check=True, timeout=300)
