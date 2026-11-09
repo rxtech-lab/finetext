@@ -65,6 +65,8 @@ jobs:
           SPARKLE_KEY: ${{ secrets.SPARKLE_KEY }}
         run: python3 scripts/ci/resolve-sparkle-key.py
       - run: python3 scripts/ci/test_validate_appcast.py
+      - name: Test release signing checks
+        run: python3 scripts/ci/test_sign_sparkle.py
       - uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
