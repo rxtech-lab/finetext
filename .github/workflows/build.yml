@@ -17,7 +17,9 @@ jobs:
       - run: brew install xcodegen
       - run: xcodegen generate --spec project.yml
       - name: Test release signing checks
-        run: python3 scripts/ci/test_sign_sparkle.py
+        run: |
+          python3 scripts/ci/test_sign_sparkle.py
+          python3 scripts/ci/test_select_signing_identity.py
       - name: Test RxAgentSDK CLI integrations
         run: python3 scripts/test-claude-code.py
       - name: Test AI detector and automatic humanization

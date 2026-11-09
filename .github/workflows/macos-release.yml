@@ -42,6 +42,7 @@ jobs:
     env:
       VERSION: ${{ github.ref_name }}
       BUILD_NUMBER: ${{ github.run_number }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID || 'T7GYB573Y6' }}
       SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY || secrets.SPARKLE_PUBLIC_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -66,25 +67,25 @@ jobs:
         run: python3 scripts/ci/resolve-sparkle-key.py
       - run: python3 scripts/ci/test_validate_appcast.py
       - name: Test release signing checks
-        run: python3 scripts/ci/test_sign_sparkle.py
+        run: |
+          python3 scripts/ci/test_sign_sparkle.py
+          python3 scripts/ci/test_select_signing_identity.py
       - uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.P12_PASSWORD }}
+      - name: Select Developer ID certificate for the configured team
+        run: python3 scripts/ci/select-signing-identity.py
       - name: Archive and sign
-        env:
-          SIGNING_CERTIFICATE_NAME: ${{ secrets.SIGNING_CERTIFICATE_NAME }}
         run: |
           xcodegen generate --spec project.yml
-          xcodebuild -project FineText.xcodeproj -scheme FineText -configuration Release -destination 'generic/platform=macOS' -archivePath output/output.xcarchive -derivedDataPath output/DerivedData CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_CERTIFICATE_NAME" OTHER_CODE_SIGN_FLAGS='--options=runtime --timestamp' ARCHS=arm64 MARKETING_VERSION="${VERSION#v}" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" SPARKLE_PUBLIC_KEY="$SPARKLE_PUBLIC_KEY" archive
+          xcodebuild -project FineText.xcodeproj -scheme FineText -configuration Release -destination 'generic/platform=macOS' -archivePath output/output.xcarchive -derivedDataPath output/DerivedData DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGNING_CERTIFICATE_NAME" OTHER_CODE_SIGN_FLAGS='--options=runtime --timestamp' ARCHS=arm64 MARKETING_VERSION="${VERSION#v}" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" SPARKLE_PUBLIC_KEY="$SPARKLE_PUBLIC_KEY" archive
           bash scripts/ci/sign-sparkle.sh
       - name: Package and notarize
         run: bash scripts/ci/notary.sh
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PWD: ${{ secrets.APPLE_ID_PWD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          SIGNING_CERTIFICATE_NAME: ${{ secrets.SIGNING_CERTIFICATE_NAME }}
       - name: Prepare release notes
         env:
           GH_TOKEN: ${{ github.token }}

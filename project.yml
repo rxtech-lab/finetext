@@ -34,7 +34,7 @@ settings:
     CURRENT_PROJECT_VERSION: 1
     GENERATE_INFOPLIST_FILE: YES
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: P9KK452K8P
+    DEVELOPMENT_TEAM: T7GYB573Y6
     INFOPLIST_KEY_CFBundleDisplayName: FineText
     INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
     ARCHS: arm64
