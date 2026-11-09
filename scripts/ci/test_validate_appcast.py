@@ -29,13 +29,14 @@ class ArchiveSignatureTests(unittest.TestCase):
         signature = base64.b64encode(key.sign(self.archive.read_bytes())).decode()
         self.plist = directory / "Info.plist"
         self.plist.write_bytes(plistlib.dumps({"CFBundleVersion": "42", "CFBundleShortVersionString": "2.0.1",
+            "LSMinimumSystemVersion": "26.0",
             "SUPublicEDKey": base64.b64encode(public).decode(),
             "SUFeedURL": "https://update.finetext.rxlab.app/appcast.xml"}))
         self.prefix = "https://update.finetext.rxlab.app/v2.0.1/"
         self.feed = directory / "appcast.xml"
         self.feed.write_text(f'''<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel><item>
             <sparkle:version>42</sparkle:version><sparkle:shortVersionString>2.0.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
             <sparkle:releaseNotesLink>https://update.finetext.rxlab.app/FineText.html</sparkle:releaseNotesLink>
             <enclosure url="{self.prefix}FineText.dmg" length="{self.archive.stat().st_size}" sparkle:edSignature="{signature}"/>
             </item></channel></rss>''')
@@ -48,6 +49,30 @@ class ArchiveSignatureTests(unittest.TestCase):
 
     def test_accepts_matching_signed_archive(self):
         self.validate()
+
+    def test_rejects_feed_with_wrong_minimum_os(self):
+        tree = ET.parse(self.feed)
+        tree.find("./channel/item/{http://www.andymatuschak.org/xml-namespaces/sparkle}minimumSystemVersion").text = "15.0"
+        tree.write(self.feed)
+        with self.assertRaisesRegex(AssertionError, "Wrong minimum macOS version"):
+            self.validate()
+
+    def test_rejects_app_and_feed_with_old_minimum_os(self):
+        app = plistlib.loads(self.plist.read_bytes())
+        app["LSMinimumSystemVersion"] = "15.0"
+        self.plist.write_bytes(plistlib.dumps(app))
+        tree = ET.parse(self.feed)
+        tree.find("./channel/item/{http://www.andymatuschak.org/xml-namespaces/sparkle}minimumSystemVersion").text = "15.0"
+        tree.write(self.feed)
+        with self.assertRaisesRegex(AssertionError, "App requires macOS older than 26.0"):
+            self.validate()
+
+    def test_rejects_app_missing_minimum_os(self):
+        app = plistlib.loads(self.plist.read_bytes())
+        del app["LSMinimumSystemVersion"]
+        self.plist.write_bytes(plistlib.dumps(app))
+        with self.assertRaisesRegex(AssertionError, "Missing minimum macOS version"):
+            self.validate()
 
     def test_rejects_same_length_tampered_archive(self):
         self.archive.write_bytes(b"tamper" + self.archive.read_bytes()[6:])
