@@ -36,7 +36,7 @@ jobs:
           retention-days: 1
   release:
     if: ${{ !inputs.resolve_public_key_only }}
-    runs-on: macos-26
+    runs-on: [self-hosted, macOS]
     permissions:
       contents: write
     env:
