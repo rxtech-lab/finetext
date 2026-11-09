@@ -24,6 +24,7 @@ struct SettingsView: View {
 struct GeneralSettingsView: View {
   @Environment(AppUpdater.self) private var updater
   @Environment(Preferences.self) private var preferences
+  @State private var showClaudeCode = false
 
   var body: some View {
     @Bindable var updater = updater
@@ -45,6 +46,9 @@ struct GeneralSettingsView: View {
         }
       }
       CodexSettingsSection()
+      Section {
+        Button("Claude Code") { showClaudeCode = true }
+      }
       Section(LocalizableKey.updates.string) {
         Toggle(LocalizableKey.automaticallyCheckForUpdates.string, isOn: $updater.automaticallyChecks)
           .disabled(!updater.isConfigured)
@@ -57,6 +61,61 @@ struct GeneralSettingsView: View {
       }
     }
     .formStyle(.grouped)
+    .sheet(isPresented: $showClaudeCode) { ClaudeCodeSetupSheet() }
+  }
+}
+
+struct ClaudeCodeSetupSheet: View {
+  @Environment(ProviderStore.self) private var store
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Form {
+        Section {
+          LabeledContent(LocalizableKey.status.string) {
+            if let install = store.claudeCode {
+              Label(LocalizableKey.installedVersion.format(install.version), systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            } else {
+              Label(LocalizableKey.notFound.string, systemImage: "xmark.circle").foregroundStyle(.secondary)
+            }
+          }
+          if let install = store.claudeCode {
+            LabeledContent(LocalizableKey.location.string) {
+              Text(install.executable.path).font(.caption.monospaced()).textSelection(.enabled)
+                .lineLimit(1).truncationMode(.middle)
+            }
+          }
+        } header: {
+          Text("Claude Code")
+        } footer: {
+          Text(LocalizableKey.claudeCodeSetup.string).font(.caption).foregroundStyle(.secondary)
+        }
+      }
+      .formStyle(.grouped)
+      Divider()
+      HStack {
+        Button(LocalizableKey.detectAgain.string) {
+          Haptics.tap()
+          Task { await store.detectClaudeCode() }
+        }
+        .disabled(store.detectingClaudeCode)
+        Spacer()
+        Button(LocalizableKey.done.string) { dismiss() }.keyboardShortcut(.defaultAction)
+      }
+      .padding(12)
+    }
+    .frame(width: 480)
+    .frame(minHeight: 320, maxHeight: .infinity)
+    .overlay {
+      if store.detectingClaudeCode {
+        ZStack {
+          Rectangle().fill(.regularMaterial)
+          ProgressView(LocalizableKey.checking.string)
+        }
+      }
+    }
   }
 }
 
@@ -309,48 +368,90 @@ struct ProviderEditorSheet: View {
 // MARK: - Humanizer
 
 struct HumanizerSettingsView: View {
-  @Environment(TranslateGemmaManager.self) private var gemma
+  @Environment(TranslationModelManager.self) private var gemma
+  @AppStorage(DefaultsKey.humanizationMode) private var mode = ""
+  @AppStorage(DefaultsKey.humanizationEngine) private var engine = HumanizationEngine.translateGemma
+  @AppStorage(DefaultsKey.targetAIScore) private var target = 20.0
   @AppStorage(DefaultsKey.humanizeRounds) private var rounds = 3
   @AppStorage(DefaultsKey.pivotLanguage) private var pivot = Language.japanese.code
-  @AppStorage(DefaultsKey.gemmaModel) private var model = TranslateGemmaModel.default.id
+  @AppStorage(DefaultsKey.gemmaModel) private var model = TranslationModel.default.id
   @State private var showDownload = false
+  @State private var showDetector = false
+
+  private var selectedMode: HumanizationMode {
+    HumanizationMode(rawValue: mode) ?? (rounds > 0 ? .manual : .off)
+  }
 
   var body: some View {
     Form {
       Section {
-        Stepper(value: $rounds, in: 0...5) {
-          LabeledContent(LocalizableKey.roundTrips.string, value: rounds == 0 ? LocalizableKey.off.string : "\(rounds)")
+        Picker(LocalizableKey.humanizationMode.string, selection: Binding(get: { selectedMode }, set: {
+          mode = $0.rawValue
+          if $0 == .manual { rounds = max(1, rounds) }
+        })) {
+          Text(LocalizableKey.off.string).tag(HumanizationMode.off)
+          Text(LocalizableKey.manualRounds.string).tag(HumanizationMode.manual)
+          Text(LocalizableKey.automaticRounds.string).tag(HumanizationMode.automatic)
         }
-        Picker(LocalizableKey.pivotLanguage.string, selection: $pivot) {
-          ForEach(Language.all) { Text($0.localizedName).tag($0.code) }
+        if selectedMode == .manual {
+          Stepper(value: $rounds, in: 1...Int.max) {
+            LabeledContent(LocalizableKey.roundTrips.string, value: "\(max(1, rounds))")
+          }
         }
-        .disabled(rounds == 0)
+        if selectedMode == .automatic {
+          LabeledContent(LocalizableKey.targetAIScore.string, value: "\(Int(target))/100")
+          Slider(value: $target, in: 0...100, step: 1) { Text(LocalizableKey.targetAIScore.string) }
+        }
+        if selectedMode != .off {
+          Picker(LocalizableKey.humanizationEngine.string, selection: $engine) {
+            Text(LocalizableKey.translationRoundTrip.string).tag(HumanizationEngine.translateGemma)
+            Text(LocalizableKey.selectedRewriteModel.string).tag(HumanizationEngine.rewriteModel)
+          }
+          if engine == .translateGemma {
+            Picker(LocalizableKey.pivotLanguage.string, selection: $pivot) {
+              ForEach(Language.all) { Text($0.localizedName).tag($0.code) }
+            }
+          }
+        }
       } header: {
         Text(LocalizableKey.reduceTheAiFeel.string)
       } footer: {
-        Text(LocalizableKey.afterEachRewriteTranslategemmaTranslatesTheTextToThePivotLanguageAndBackThisManyTimes0TurnsItOffAndNoTranslationModelIsUsed.string)
+        Text(selectedMode == .automatic ? LocalizableKey.automaticRoundsHelp.string : LocalizableKey.manualRoundsHelp.string)
           .font(.caption).foregroundStyle(.secondary)
       }
 
       Section {
-        Picker(LocalizableKey.model.string, selection: $model) {
-          ForEach(TranslateGemmaModel.all) { Text("\($0.name) (\($0.size))").tag($0.id) }
+        Button { showDetector = true; Haptics.tap() } label: {
+          LabeledContent(LocalizableKey.aiDetector.string, value: AIDetectorEngine.selected.name)
         }
-        .disabled(gemma.isDownloading)
-        .onChange(of: model) { gemma.refresh() }
-        statusRow
-      } header: {
-        Text("TranslateGemma")
+        .buttonStyle(.plain)
       } footer: {
-        Text(LocalizableKey.translategemmaIsAnOpenTranslationModelFromGoogleItRunsOnThisMacWithMlxOnAppleSiliconAndIsDownloadedSeparatelyFromHuggingFace.string)
-          .font(.caption).foregroundStyle(.secondary)
+        Text(LocalizableKey.detectorScoreHelp.string).font(.caption).foregroundStyle(.secondary)
+      }
+
+      if engine == .translateGemma {
+        Section {
+          Picker(LocalizableKey.model.string, selection: $model) {
+            ForEach(TranslationModel.all) { Text("\($0.name) (\($0.size))").tag($0.id) }
+          }
+          .disabled(gemma.isDownloading || gemma.isRemoving)
+          .onChange(of: model) { gemma.refresh() }
+          statusRow
+        } header: {
+          Text(LocalizableKey.translationModel.string)
+        } footer: {
+          Text(TranslationModel.named(model).isNLLB ? LocalizableKey.nllbDescription.string : LocalizableKey.translategemmaIsAnOpenTranslationModelFromGoogleItRunsOnThisMacWithMlxOnAppleSiliconAndIsDownloadedSeparatelyFromHuggingFace.string)
+            .font(.caption).foregroundStyle(.secondary)
+        }
       }
     }
     .formStyle(.grouped)
+    .overlay(alignment: .bottom) { SettingsToast(toast: gemma.toast) }
     .onAppear { gemma.refresh() }
     .sheet(isPresented: $showDownload) {
-      ModelDownloadSheet(model: TranslateGemmaModel.named(model))
+      ModelDownloadSheet(model: TranslationModel.named(model))
     }
+    .sheet(isPresented: $showDetector) { AIDetectorSettingsSheet() }
   }
 
   @ViewBuilder private var statusRow: some View {
@@ -394,11 +495,11 @@ struct HumanizerSettingsView: View {
   }
 }
 
-/// Downloads the selected TranslateGemma model, with progress, size, speed and cancel.
+/// Downloads the selected translation model, with progress, size, speed and cancel.
 struct ModelDownloadSheet: View {
-  @Environment(TranslateGemmaManager.self) private var gemma
+  @Environment(TranslationModelManager.self) private var gemma
   @Environment(\.dismiss) private var dismiss
-  let model: TranslateGemmaModel
+  let model: TranslationModel
 
   var body: some View {
     VStack(spacing: 0) {
@@ -416,7 +517,7 @@ struct ModelDownloadSheet: View {
           }
           .padding(.vertical, 4)
         } footer: {
-          Text(LocalizableKey.downloadedFromHuggingFaceItRunsOnThisMacWithMlxAndNeverLeavesYourDevice.string)
+          Text(model.isNLLB ? LocalizableKey.nllbDownloadDescription.string : LocalizableKey.downloadedFromHuggingFaceItRunsOnThisMacWithMlxAndNeverLeavesYourDevice.string)
             .font(.caption).foregroundStyle(.secondary)
         }
 

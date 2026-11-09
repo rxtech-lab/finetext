@@ -30,6 +30,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   var toast: Toast?
   private(set) var statuses: [UUID: JobStatus] = [:]
   private var tasks: [UUID: Task<Void, Never>] = [:]
+  private var taskTokens: [UUID: UUID] = [:]
   private var toastTask: Task<Void, Never>?
 
   init(container: ModelContainer, providers: ProviderStore, preferences: Preferences) {
@@ -100,6 +101,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   }
 
   private func cancelAll() {
+    taskTokens.removeAll()
     tasks.values.forEach { $0.cancel() }
     tasks.removeAll()
     statuses.removeAll()
@@ -178,6 +180,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   func remove(_ item: any PersistentModel, id: UUID) {
     tasks[id]?.cancel()
     tasks[id] = nil
+    taskTokens[id] = nil
     statuses[id] = nil
     if route != nil { route = nil }
     context.delete(item)
@@ -189,7 +192,9 @@ enum WorkTab: String, CaseIterable, Identifiable {
   func stop(_ id: UUID) {
     tasks[id]?.cancel()
     tasks[id] = nil
+    taskTokens[id] = nil
     statuses[id] = .idle
+    save()
   }
 
   // MARK: Run
@@ -215,20 +220,24 @@ enum WorkTab: String, CaseIterable, Identifiable {
 
   private func start(_ id: UUID, _ work: @escaping @MainActor () async throws -> Void) {
     tasks[id]?.cancel()
+    let token = UUID()
+    taskTokens[id] = token
     statuses[id] = .running(LocalizableKey.starting.string)
     tasks[id] = Task {
       do {
         try await work()
+        try Task.checkCancellation()
+        guard taskTokens[id] == token else { return }
         statuses[id] = .done
         save()
       } catch is CancellationError {
-        statuses[id] = .idle
+        if taskTokens[id] == token { statuses[id] = .idle }
       } catch let error as URLError where error.code == .cancelled {
-        statuses[id] = .idle
+        if taskTokens[id] == token { statuses[id] = .idle }
       } catch {
-        statuses[id] = .failed(error.localizedDescription)
+        if taskTokens[id] == token { statuses[id] = .failed(error.localizedDescription) }
       }
-      tasks[id] = nil
+      if taskTokens[id] == token { tasks[id] = nil; taskTokens[id] = nil; save() }
     }
   }
 
@@ -240,9 +249,17 @@ enum WorkTab: String, CaseIterable, Identifiable {
     preferences.setTone(item.tone, for: item)
     let model = item.model
     start(id) {
+      item.refinementSource = text
       item.output = ""
       item.note = nil
+      item.initialAIScore = nil
+      item.finalAIScore = nil
+      item.targetAIScore = nil
+      item.detectorEngineRaw = nil
+      item.aiScoredText = nil
+      item.humanizationRounds = 0
       let raw = try await self.chat(model, messages: messages, id: id, status: LocalizableKey.rewriting.string) { delta in item.output += delta }
+      try Task.checkCancellation()
       item.output = Prompts.clean(raw)
       try await self.humanize(item, id: id)
     }
@@ -252,10 +269,10 @@ enum WorkTab: String, CaseIterable, Identifiable {
   private func chat(
     _ model: ModelRef, messages: [ChatMessage], id: UUID, status: String, onDelta: @MainActor @Sendable @escaping (String) -> Void
   ) async throws -> String {
-    if providers.isCodex(model) {
-      guard let install = providers.codex else { throw CodexError.notInstalled }
-      return try await CodexSession.chat(
-        install: install, messages: messages, status: status,
+    if providers.isCodex(model) || providers.isClaudeCode(model) {
+      let client = try providers.agentClient(for: model)
+      return try await AgentTextSession.chat(
+        client: client, messages: messages, model: CLIModels.explicitModel(model.modelID), status: status,
         onStatus: { [weak self] in self?.statuses[id] = .running($0) }, onDelta: onDelta
       )
     }
@@ -280,23 +297,67 @@ enum WorkTab: String, CaseIterable, Identifiable {
 
   private func humanize(_ item: RewriteItem, id: UUID) async throws {
     let defaults = UserDefaults.standard
+    let mode = HumanizationMode.selected(in: defaults)
     let rounds = defaults.integer(forKey: DefaultsKey.humanizeRounds)
-    guard rounds > 0 else { return }
+    let engine = HumanizationEngine(rawValue: defaults.string(forKey: DefaultsKey.humanizationEngine) ?? "") ?? .translateGemma
+    let detector = AIDetectorEngine.selected
+    let configuredTarget = defaults.double(forKey: DefaultsKey.targetAIScore)
+    let target = configuredTarget.isFinite ? min(100, max(0, configuredTarget)) : 20
     let pivot = Language.named(code: defaults.string(forKey: DefaultsKey.pivotLanguage) ?? Language.japanese.code)
+    let translationModel = TranslationModel.fromDefaults()
+    let rewriteModel = item.model
+    var scoring: (@MainActor (String) async throws -> Double)?
     do {
-      let model = TranslateGemmaModel.fromDefaults()
-      guard await TranslateGemma.shared.isInstalled(model) else {
-        item.note = LocalizableKey.humanizerSkippedDownloadTranslategemmaInSettings.string
-        return
+      if detector != .disabled {
+        do {
+          try AIDetector.validate(item.output)
+          guard await AIDetector.shared.isInstalled(detector) else { throw AIDetectorError.notReady }
+          scoring = { [weak self] text in
+            try Task.checkCancellation()
+            self?.statuses[id] = .running(LocalizableKey.checkingAIScore.string)
+            return try await AIDetector.shared.score(text, engine: detector)
+          }
+        } catch {
+          if mode == .automatic { throw error }
+          item.note = LocalizableKey.detectorUnavailable.format(error.localizedDescription)
+        }
       }
-      let result = try await TranslateGemma.shared.humanize(item.output, rounds: rounds, pivot: pivot, model: model) { [weak self] round in
-        self?.statuses[id] = .running(LocalizableKey.humanizing.format(round, rounds, pivot.localizedName))
-      }
-      item.output = result
-    } catch let error as CancellationError {
-      throw error
+      if mode == .automatic, scoring == nil { throw AIDetectorError.notReady }
+      item.targetAIScore = mode == .automatic ? target : nil
+      item.detectorEngineRaw = scoring == nil ? nil : detector.rawValue
+      _ = try await HumanizationLoop.run(
+        text: item.output, mode: mode, rounds: max(1, rounds), target: target, score: scoring,
+        refine: { [weak self] text, round in
+          guard let self else { throw CancellationError() }
+          try Task.checkCancellation()
+          let status = LocalizableKey.humanizingRound.format(round)
+          self.statuses[id] = .running(status)
+          if engine == .translateGemma {
+            guard await TranslationEngine.shared.isInstalled(translationModel) else {
+              throw MLXHubError.notDownloaded
+            }
+            return try await TranslationEngine.shared.humanize(text, rounds: 1, pivot: pivot, model: translationModel) { _ in }
+          }
+          let messages = Prompts.humanize(text, source: item.refinementSource ?? self.originalText, item: item)
+          let raw = try await self.chat(rewriteModel, messages: messages, id: id, status: status) { _ in }
+          return Prompts.clean(raw)
+        },
+        update: { [weak self] result in
+          if result.rounds == 0 { item.initialAIScore = result.score }
+          item.output = result.text
+          item.finalAIScore = result.score
+          item.aiScoredText = result.score == nil ? nil : result.text
+          item.humanizationRounds = result.rounds
+          self?.save()
+        }
+      )
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch let error as URLError where error.code == .cancelled {
+      throw CancellationError()
     } catch {
-      item.note = LocalizableKey.humanizerSkipped.format(error.localizedDescription)
+      try Task.checkCancellation()
+      item.note = LocalizableKey.humanizationStopped.format(error.localizedDescription)
     }
   }
 
@@ -489,6 +550,19 @@ enum WorkTab: String, CaseIterable, Identifiable {
 // MARK: - Prompts
 
 enum Prompts {
+  static func humanize(_ text: String, source: String, item: RewriteItem) -> [ChatMessage] {
+    [
+      ChatMessage(role: "system", content: """
+      Edit the draft into natural writing for \(item.customPlatformName ?? item.platform.promptTitle).
+      Tone: \(item.tone.guidance).
+      \(item.customPlatformInstruction ?? item.platform.guidelines)
+      \(humanStyle)
+      Preserve all facts, meaning, links and the original language. The original is the source of truth.
+      Do not invent experiences or add errors. Return only the finished text.
+      """),
+      ChatMessage(role: "user", content: "Original:\n\(source)\n\nDraft to improve:\n\(text)"),
+    ]
+  }
   static let humanStyle = """
   Write like a real person, not an AI: vary sentence length, use plain words, keep the author's voice. \
   Avoid clichés such as "delve", "game-changer", "unlock", "elevate", "in today's fast-paced world", \

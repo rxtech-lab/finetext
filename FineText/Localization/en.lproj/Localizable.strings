@@ -73,7 +73,7 @@
 "location" = "Location";
 "detectAgain" = "Detect Again";
 "installTheCodexCliToRewriteAndGenerateImagesWithYourChatgptPlan" = "Install the Codex CLI (`brew install codex`) and run `codex login` to rewrite, translate and generate images with your ChatGPT plan.";
-"chooseCodexToRewriteTranslateAndGenerateImagesWithYourCodexSignIn" = "Choose Codex as a text or image model to rewrite, translate and generate images through `codex app-server` with your Codex sign-in. Text uses the default model from your Codex config.";
+"chooseCodexToRewriteTranslateAndGenerateImagesWithYourCodexSignIn" = "Choose a model in the Codex submenu to rewrite or translate with your Codex sign-in. CLI Default uses your Codex configuration. Codex also supports image generation.";
 "noProviders" = "No providers";
 "addAnOpenaiCompatibleEndpointWithItsUrlAndApiKeyToStartRewriting" = "Add an OpenAI-compatible endpoint with its URL and API key to start rewriting.";
 "addProvider" = "Add Provider…";
@@ -98,7 +98,7 @@
 "off" = "Off";
 "pivotLanguage" = "Pivot language";
 "reduceTheAiFeel" = "Reduce the AI feel";
-"afterEachRewriteTranslategemmaTranslatesTheTextToThePivotLanguageAndBackThisManyTimes0TurnsItOffAndNoTranslationModelIsUsed" = "After each rewrite, TranslateGemma translates the text to the pivot language and back this many times. 0 turns it off and no translation model is used.";
+"afterEachRewriteTranslategemmaTranslatesTheTextToThePivotLanguageAndBackThisManyTimes0TurnsItOffAndNoTranslationModelIsUsed" = "After each rewrite, the selected translation model translates the text to the pivot language and back this many times. 0 turns it off.";
 "translategemmaIsAnOpenTranslationModelFromGoogleItRunsOnThisMacWithMlxOnAppleSiliconAndIsDownloadedSeparatelyFromHuggingFace" = "TranslateGemma is an open translation model from Google. It runs on this Mac with MLX on Apple silicon and is downloaded separately from Hugging Face.";
 "notDownloaded" = "Not downloaded";
 "download" = "Download…";
@@ -120,7 +120,7 @@
 "retry" = "Retry";
 "downloadAction" = "Download";
 "removeModel" = "Remove Model…";
-"removeTheDownloadedTranslategemmaModel" = "Remove the downloaded TranslateGemma model?";
+"removeTheDownloadedTranslategemmaModel" = "Remove the selected translation model?";
 "youCanDownloadItAgainAtAnyTime" = "You can download it again at any time.";
 "blogPost" = "Blog Post";
 "professional" = "Professional";
@@ -143,7 +143,7 @@
 "starting" = "Starting…";
 "addYourOriginalPostFirst" = "Add your original post first";
 "rewriting" = "Rewriting…";
-"humanizerSkippedDownloadTranslategemmaInSettings" = "Humanizer skipped: download TranslateGemma in Settings.";
+"humanizerSkippedDownloadTranslategemmaInSettings" = "Humanizer skipped: download the selected translation model in Settings.";
 "nothingToTranslateYet" = "Nothing to translate yet";
 "addAPostOrAnInstructionFirst" = "Add a post or an instruction first";
 "generatingImage" = "Generating image…";
@@ -286,3 +286,89 @@
 "customPlatformUpdated" = "Custom platform updated";
 "customPlatformSaved" = "Custom platform saved";
 "customPlatformDeleted" = "Custom platform deleted";
+
+/* Platform variants */
+"postVariant" = "Post";
+"commentVariant" = "Comment";
+"replyVariant" = "Reply";
+"threadVariant" = "Thread";
+
+"claudeCodeNotInstalled" = "Claude Code is not installed. Install it with `brew install --cask claude-code`.";
+"claudeCodeError" = "Claude Code: %@";
+"startingClaudeCode" = "Starting Claude Code…";
+"claudeCodeCheckLogin" = "Claude Code failed. Run `claude auth login` in Terminal and try again.";
+"claudeCodeSetup" = "Install Claude Code (`brew install --cask claude-code`) and run `claude auth login` in Terminal. Choose a model in the Claude Code submenu to rewrite and translate using your existing credentials. CLI Default uses your Claude Code configuration. Image generation is not supported.";
+
+"cliDefaultModel" = "CLI Default";
+
+"beforeRefinement" = "Before refinement";
+"afterRefinement" = "After refinement";
+"showBeforeRefinement" = "Show before refinement";
+"showAfterRefinement" = "Show after refinement";
+
+"translationModel" = "Translation model";
+
+"nllbDescription" = "Meta NLLB-200 runs locally through native ONNX Runtime bindings. Downloaded separately from Hugging Face. CC-BY-NC 4.0: noncommercial use only.";
+
+"nllbDownloadDescription" = "Downloads the quantized ONNX conversion of Meta NLLB-200 from Hugging Face. Runs entirely on this Mac using native Swift bindings. CC-BY-NC 4.0: noncommercial use only.";
+
+
+
+"nllbUnsupportedLanguage" = "NLLB does not support this language in FineText. Choose another translation model.";
+
+
+/* AI detector and automatic humanization */
+"humanizationMode" = "Checking mode";
+"manualRounds" = "Fixed rounds";
+"automaticRounds" = "Automatic · target score";
+"targetAIScore" = "Target AI score";
+"humanizationEngine" = "Humanization engine";
+"translationRoundTrip" = "Translation round trip";
+"selectedRewriteModel" = "Selected rewrite model";
+"automaticRoundsHelp" = "Check after every round until the AI score reaches the target, three consecutive rounds do not lower the best score, or you press Stop. Improving runs have no round limit. The lowest-scoring result is kept. Each round uses the chosen engine and may use provider credits.";
+"manualRoundsHelp" = "Choose a fixed number of humanization rounds, or turn humanization off. A downloaded detector can score the result in either mode.";
+"aiDetector" = "AI detector";
+"detectorEngine" = "Detector engine";
+"detectorScoreHelp" = "Scores estimate AI-like patterns, not authorship or writing quality. Lower is less AI-like. These detectors support English prose of at least 50 words; other languages and shorter text are not scored.";
+"detectorDownloadHelp" = "Requires Python 3.10–3.13 on this Mac. Download installs a private inference runtime and model weights. After setup, scoring runs locally and offline.";
+"license" = "License";
+"detectorRemoveHelp" = "Remove this detector’s downloaded weights from this Mac? You can download them again.";
+"removingDetector" = "Removing detector…";
+"detectorShowError" = "Show download error…";
+"preparingDetector" = "Preparing runtime and starting download…";
+"detectorNotReady" = "Choose and download an AI detector in Settings → Humanizer → AI detector before using automatic checking.";
+"detectorPythonMissing" = "Install Python 3.10–3.13, then retry the detector download.";
+"detectorRunnerMissing" = "The detector runtime script is missing. Reinstall FineText.";
+"detectorInvalidScore" = "The detector returned an invalid score.";
+"detectorUnsupportedText" = "AI scoring requires English prose with at least 50 words.";
+"detectorFailure" = "AI detector failed: %@";
+"detectorUnavailable" = "AI score unavailable: %@";
+"checkingAIScore" = "Checking AI score…";
+"humanizingRound" = "Humanizing · round %lld";
+"humanizationStopped" = "Humanization stopped: %@";
+"aiScoreValue" = "AI score: %@/100";
+"initialRewriteScore" = "Initial rewrite score";
+"finalAIScore" = "Final AI score";
+"completedRounds" = "Completed rounds";
+"aiTargetReached" = "Target reached";
+"aiTargetNotReached" = "Target not reached · best result kept";
+
+"nllbInvalidOutput" = "NLLB returned an invalid translation tensor.";
+
+"nllbOutputLimit" = "NLLB reached its translation limit. Try shorter paragraphs or another translation model.";
+
+"removingTranslationModel" = "Removing translation model…";
+
+/* Detector download stages */
+"detectorRuntime" = "Inference runtime";
+"detectorRuntimeNotInstalled" = "Not installed";
+"detectorRuntimePreparing" = "Setting up…";
+"detectorCheckingPython" = "Finding a compatible Python installation…";
+"detectorCreatingRuntime" = "Creating the inference runtime…";
+"detectorInstallingDependencies" = "Downloading and installing runtime packages…";
+"detectorVerifyingRuntime" = "Verifying the inference runtime…";
+"detectorDownloadingModel" = "Downloading detector model…";
+"detectorCancelling" = "Cancelling download…";
+"detectorModelReady" = "Detector model downloaded and ready";
+
+"refinementChangeLegend" = "Added text: green. Deleted text: red with a strike-through. Moved text: blue.";

@@ -105,7 +105,10 @@ struct RewriteDetailView: View {
           if let note = item.note {
             Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.orange)
           }
-          OutputEditor(text: $item.output, limit: item.characterLimit)
+          RefinementResultView(
+            original: item.refinementSource ?? workspace.originalText,
+            output: $item.output, status: status, limit: item.characterLimit, assessment: item
+          )
         }
         .padding(14)
         Divider()

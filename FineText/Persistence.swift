@@ -38,7 +38,15 @@ import SwiftData
   var providerID = UUID()
   var modelID = ""
   var output = ""
+  /// The actual input used for this rewrite, even if the session draft changes later.
+  var refinementSource: String?
   var note: String?
+  var initialAIScore: Double?
+  var finalAIScore: Double?
+  var targetAIScore: Double?
+  var detectorEngineRaw: String?
+  var aiScoredText: String?
+  var humanizationRounds = 0
   var session: RefinementSession?
 
   init(platform: Platform, tone: Tone, model: ModelRef) {

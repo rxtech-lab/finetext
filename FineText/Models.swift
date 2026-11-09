@@ -3,23 +3,57 @@ import Foundation
 // MARK: - Platforms & tones
 
 enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
-  case x, reddit, linkedin, blog, message
+  case x, xReply, xThread, reddit, redditComment, linkedin, blog, message
 
   var id: String { rawValue }
 
   var title: String {
     switch self {
-    case .x: "X"
-    case .reddit: "Reddit"
+    case .x, .xReply, .xThread: "X · \(variantTitle)"
+    case .reddit, .redditComment: "Reddit · \(variantTitle)"
     case .linkedin: "LinkedIn"
     case .blog: LocalizableKey.blogPost.string
     case .message: LocalizableKey.message.string
     }
   }
 
+  /// Top-level entries; variants are selected in a submenu before the model.
+  static let menuPlatforms: [Platform] = [.x, .reddit, .linkedin, .blog, .message]
+
+  var variants: [Platform] {
+    switch self {
+    case .x, .xReply, .xThread: [.x, .xReply, .xThread]
+    case .reddit, .redditComment: [.reddit, .redditComment]
+    default: []
+    }
+  }
+
+  var menuTitle: String {
+    switch self {
+    case .x, .xReply, .xThread: "X"
+    case .reddit, .redditComment: "Reddit"
+    default: title
+    }
+  }
+
+  var variantTitle: String {
+    switch self {
+    case .x, .reddit: LocalizableKey.postVariant.string
+    case .xReply: LocalizableKey.replyVariant.string
+    case .xThread: LocalizableKey.threadVariant.string
+    case .redditComment: LocalizableKey.commentVariant.string
+    default: title
+    }
+  }
+
   /// Stable English label used in model instructions.
   var promptTitle: String {
     switch self {
+    case .x: "X Post"
+    case .xReply: "X Reply"
+    case .xThread: "X Thread"
+    case .reddit: "Reddit Post"
+    case .redditComment: "Reddit Comment"
     case .blog: "Blog Post"
     case .message: "Message"
     default: title
@@ -28,8 +62,8 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
 
   var symbol: String {
     switch self {
-    case .x: "xmark"
-    case .reddit: "bubble.left.and.bubble.right"
+    case .x, .xReply, .xThread: "xmark"
+    case .reddit, .redditComment: "bubble.left.and.bubble.right"
     case .linkedin: "briefcase"
     case .blog: "doc.richtext"
     case .message: "message"
@@ -38,8 +72,8 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
 
   var defaultTone: Tone {
     switch self {
-    case .x: .witty
-    case .reddit: .casual
+    case .x, .xReply, .xThread: .witty
+    case .reddit, .redditComment: .casual
     case .linkedin: .professional
     case .blog: .storytelling
     case .message: .natural
@@ -47,7 +81,12 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
   }
 
   /// Soft character limit shown in the editor; nil means no limit.
-  var characterLimit: Int? { self == .x ? 280 : nil }
+  var characterLimit: Int? {
+    switch self {
+    case .x, .xReply: 280
+    default: nil
+    }
+  }
 
   var guidelines: String {
     switch self {
@@ -57,11 +96,31 @@ enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
       - Lead with the most interesting idea. Punchy, scannable.
       - At most 1-2 relevant hashtags, only if they add value. No hashtag walls.
       """
+    case .xReply:
+      """
+      - A single reply of at most 280 characters (count carefully).
+      - Respond directly and naturally to the point in the source; keep the author's intended meaning.
+      - No title, thread numbering, or hashtags. Do not invent context about the post being replied to.
+      """
+    case .xThread:
+      """
+      - A thread of connected X posts, each at most 280 characters including its numbering.
+      - Separate posts with a blank line and number them 1/N, 2/N, and so on.
+      - Open with a clear hook. Give each post a complete thought and keep a logical progression.
+      - Use only as many posts as needed. Preserve the source facts; do not pad or invent details.
+      """
     case .reddit:
       """
       - Start with a line "Title: <title>" followed by a blank line and the body.
       - Conversational and authentic, like a community member, not a marketer.
       - No hashtags. Markdown is allowed. Invite discussion naturally at the end.
+      """
+    case .redditComment:
+      """
+      - A Reddit comment, not a standalone post: no title or "Title:" line.
+      - Conversational, authentic, and relevant to the point in the source, like a community member.
+      - Preserve the author's intent. Do not invent context about the parent post or other commenters.
+      - No hashtags or promotional language. Markdown is allowed; keep the response focused.
       """
     case .linkedin:
       """
@@ -244,6 +303,10 @@ enum ImageSize: String, CaseIterable, Identifiable, Sendable {
 // MARK: - Defaults
 
 enum DefaultsKey {
+  static let humanizationMode = "humanizationMode"
+  static let humanizationEngine = "humanizationEngine"
+  static let detectorEngine = "aiDetectorEngine"
+  static let targetAIScore = "targetAIScore"
   static let humanizeRounds = "humanizeRounds"
   static let pivotLanguage = "pivotLanguage"
   static let gemmaModel = "translateGemmaMLXModel"
@@ -258,7 +321,10 @@ enum DefaultsKey {
     UserDefaults.standard.register(defaults: [
       humanizeRounds: 3,
       pivotLanguage: Language.japanese.code,
-      gemmaModel: TranslateGemmaModel.default.id,
+      gemmaModel: TranslationModel.default.id,
+      humanizationEngine: HumanizationEngine.translateGemma.rawValue,
+      detectorEngine: AIDetectorEngine.disabled.rawValue,
+      targetAIScore: 20.0,
     ])
   }
 }

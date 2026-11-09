@@ -231,52 +231,6 @@ final class CodexSession: @unchecked Sendable {
   private static let toolRules = "Do not run shell commands, read or edit files, browse, or ask follow-up questions."
 }
 
-// MARK: - Text
-
-extension CodexSession {
-  /// Streams a reply from the user's Codex default model, for rewriting and translating. System messages become the
-  /// thread's developer instructions; the remaining messages become the turn input.
-  static func chat(install: CodexInstall, messages: [ChatMessage], status: String,
-                   onStatus: @MainActor @Sendable @escaping (String) -> Void,
-                   onDelta: @MainActor @Sendable @escaping (String) -> Void) async throws -> String {
-    let system = messages.filter { $0.role == "system" }.map(\.content)
-    let conversation = messages.filter { $0.role != "system" }
-    let prompt = conversation.count == 1
-      ? conversation[0].content
-      : conversation.map { "\($0.role.capitalized):\n\($0.content)" }.joined(separator: "\n\n")
-    let instructions = (system + ["You are a writing assistant inside the FineText app. \(toolRules)"]).joined(separator: "\n\n")
-
-    final class State: @unchecked Sendable { var streamed = ""; var final: String?; var announced = false }
-    let state = State()
-    let turn = Turn<String>(instructions: instructions, input: [textInput(prompt)], effort: "low") { method, params in
-      switch method {
-      case "item/agentMessage/delta":
-        guard let delta = params["delta"] as? String, !delta.isEmpty else { return nil }
-        if !state.announced {
-          state.announced = true
-          await onStatus(status)
-        }
-        state.streamed += delta
-        await onDelta(delta)
-      case "item/completed":
-        if let item = params["item"] as? [String: Any], item["type"] as? String == "agentMessage",
-           let text = item["text"] as? String, !text.trimmed.isEmpty {
-          state.final = text
-        }
-      case "turn/completed":
-        let reply = state.final ?? state.streamed
-        guard !reply.trimmed.isEmpty else { throw APIError.empty }
-        // Deltas were already shown; deliver anything that never streamed.
-        if state.streamed.isEmpty { await onDelta(reply) }
-        return reply
-      default: break
-      }
-      return nil
-    }
-    return try await perform(install: install, turn: turn, onStatus: onStatus)
-  }
-}
-
 // MARK: - Images
 
 extension CodexSession {

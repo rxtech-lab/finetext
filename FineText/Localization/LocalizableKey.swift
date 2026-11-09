@@ -2,6 +2,23 @@ import Foundation
 
 /// Centralized UI strings. Raw values are stable localization keys, never persisted model values.
 enum LocalizableKey: String, CaseIterable, Sendable {
+  case nllbInvalidOutput
+  case nllbOutputLimit
+  case removingTranslationModel
+  case translationModel
+  case nllbDescription
+  case nllbDownloadDescription
+  case nllbUnsupportedLanguage
+  case cliDefaultModel
+  case refinementChangeLegend
+  case beforeRefinement
+  case afterRefinement
+  case showBeforeRefinement
+  case showAfterRefinement
+  case postVariant
+  case commentVariant
+  case replyVariant
+  case threadVariant
   case customPlatforms
   case noCustomPlatforms
   case customPlatformsHint
@@ -289,6 +306,58 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case millionParameters
 
   case downloadSpeed
+
+  case claudeCodeNotInstalled
+  case claudeCodeError
+  case startingClaudeCode
+  case claudeCodeCheckLogin
+  case claudeCodeSetup
+
+  case humanizationMode
+  case manualRounds
+  case automaticRounds
+  case targetAIScore
+  case humanizationEngine
+  case translationRoundTrip
+  case selectedRewriteModel
+  case automaticRoundsHelp
+  case manualRoundsHelp
+  case aiDetector
+  case detectorEngine
+  case detectorScoreHelp
+  case detectorDownloadHelp
+  case license
+  case detectorRemoveHelp
+  case removingDetector
+  case detectorShowError
+  case preparingDetector
+  case detectorNotReady
+  case detectorPythonMissing
+  case detectorRunnerMissing
+  case detectorInvalidScore
+  case detectorUnsupportedText
+  case detectorFailure
+  case detectorUnavailable
+  case checkingAIScore
+  case humanizingRound
+  case humanizationStopped
+  case aiScoreValue
+  case initialRewriteScore
+  case finalAIScore
+  case completedRounds
+  case aiTargetReached
+  case aiTargetNotReached
+
+  case detectorRuntime
+  case detectorRuntimeNotInstalled
+  case detectorRuntimePreparing
+  case detectorCheckingPython
+  case detectorCreatingRuntime
+  case detectorInstallingDependencies
+  case detectorVerifyingRuntime
+  case detectorDownloadingModel
+  case detectorCancelling
+  case detectorModelReady
 
   var string: String {
     Bundle.main.localizedString(forKey: rawValue, value: nil, table: "Localizable")

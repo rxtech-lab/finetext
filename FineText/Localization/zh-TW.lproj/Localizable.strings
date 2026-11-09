@@ -73,7 +73,7 @@
 "location" = "位置";
 "detectAgain" = "重新偵測";
 "installTheCodexCliToRewriteAndGenerateImagesWithYourChatgptPlan" = "安裝 Codex CLI（`brew install codex`）並執行 `codex login`，即可透過 ChatGPT 方案改寫、翻譯和產生圖片。";
-"chooseCodexToRewriteTranslateAndGenerateImagesWithYourCodexSignIn" = "選擇 Codex 作為文字或圖片模型，透過 `codex app-server` 使用已登入的 Codex 帳號改寫、翻譯和產生圖片。文字會使用 Codex 設定中的預設模型。";
+"chooseCodexToRewriteTranslateAndGenerateImagesWithYourCodexSignIn" = "在 Codex 子選單中選擇模型，使用現有 Codex 登入進行改寫或翻譯。「CLI 預設模型」使用 Codex 設定。Codex 也支援圖片生成。";
 "noProviders" = "尚無供應商";
 "addAnOpenaiCompatibleEndpointWithItsUrlAndApiKeyToStartRewriting" = "新增相容 OpenAI 的端點網址及 API 金鑰，即可開始改寫。";
 "addProvider" = "新增供應商…";
@@ -98,7 +98,7 @@
 "off" = "關閉";
 "pivotLanguage" = "中介語言";
 "reduceTheAiFeel" = "減少 AI 痕跡";
-"afterEachRewriteTranslategemmaTranslatesTheTextToThePivotLanguageAndBackThisManyTimes0TurnsItOffAndNoTranslationModelIsUsed" = "每次改寫後，TranslateGemma 會按此次數將文字翻譯成中介語言再譯回原文。設為 0 可關閉此功能，且不使用翻譯模型。";
+"afterEachRewriteTranslategemmaTranslatesTheTextToThePivotLanguageAndBackThisManyTimes0TurnsItOffAndNoTranslationModelIsUsed" = "每次改寫後，所選翻譯模型會按此次數將文字翻譯成中介語言再譯回原文。設為 0 可關閉。";
 "translategemmaIsAnOpenTranslationModelFromGoogleItRunsOnThisMacWithMlxOnAppleSiliconAndIsDownloadedSeparatelyFromHuggingFace" = "TranslateGemma 是 Google 的開放翻譯模型，透過 MLX 在這部配備 Apple 晶片的 Mac 上執行，需從 Hugging Face 另行下載。";
 "notDownloaded" = "尚未下載";
 "download" = "下載…";
@@ -120,7 +120,7 @@
 "retry" = "重試";
 "downloadAction" = "下載";
 "removeModel" = "移除模型…";
-"removeTheDownloadedTranslategemmaModel" = "移除已下載的 TranslateGemma 模型？";
+"removeTheDownloadedTranslategemmaModel" = "移除所選翻譯模型？";
 "youCanDownloadItAgainAtAnyTime" = "你可以隨時重新下載。";
 "blogPost" = "部落格文章";
 "professional" = "專業";
@@ -143,7 +143,7 @@
 "starting" = "正在開始…";
 "addYourOriginalPostFirst" = "請先新增原始貼文";
 "rewriting" = "正在改寫…";
-"humanizerSkippedDownloadTranslategemmaInSettings" = "已略過自然潤飾：請在設定中下載 TranslateGemma。";
+"humanizerSkippedDownloadTranslategemmaInSettings" = "已略過自然潤飾：請在設定中下載所選翻譯模型。";
 "nothingToTranslateYet" = "尚無可翻譯的內容";
 "addAPostOrAnInstructionFirst" = "請先新增貼文或指示";
 "generatingImage" = "正在產生圖片…";
@@ -286,3 +286,89 @@
 "customPlatformUpdated" = "已更新自訂平台";
 "customPlatformSaved" = "已儲存自訂平台";
 "customPlatformDeleted" = "已刪除自訂平台";
+
+/* Platform variants */
+"postVariant" = "貼文";
+"commentVariant" = "留言";
+"replyVariant" = "回覆";
+"threadVariant" = "串文";
+
+"claudeCodeNotInstalled" = "尚未安裝 Claude Code。請執行 `brew install --cask claude-code` 安裝。";
+"claudeCodeError" = "Claude Code：%@";
+"startingClaudeCode" = "正在啟動 Claude Code…";
+"claudeCodeCheckLogin" = "Claude Code 執行失敗。請在「終端機」執行 `claude auth login`，然後重試。";
+"claudeCodeSetup" = "安裝 Claude Code（`brew install --cask claude-code`），並在終端機執行 `claude auth login`。在 Claude Code 子選單中選擇模型，使用現有登入進行改寫和翻譯。「CLI 預設模型」使用 Claude Code 設定。不支援圖片生成。";
+
+"cliDefaultModel" = "CLI 預設模型";
+
+"beforeRefinement" = "潤飾前";
+"afterRefinement" = "潤飾後";
+"showBeforeRefinement" = "查看潤飾前的文字";
+"showAfterRefinement" = "查看潤飾後的文字";
+
+"translationModel" = "翻譯模型";
+
+"nllbDescription" = "Meta NLLB-200 透過原生 ONNX Runtime 綁定在本機執行，需從 Hugging Face 另行下載。CC-BY-NC 4.0：僅限非商業用途。";
+
+"nllbDownloadDescription" = "從 Hugging Face 下載 Meta NLLB-200 的量化 ONNX 版本，透過原生 Swift 綁定完全在本機執行。CC-BY-NC 4.0：僅限非商業用途。";
+
+
+
+"nllbUnsupportedLanguage" = "FineText 中的 NLLB 不支援此語言，請選擇其他翻譯模型。";
+
+
+/* AI detector and automatic humanization */
+"humanizationMode" = "檢查模式";
+"manualRounds" = "固定輪數";
+"automaticRounds" = "自動 · 目標分數";
+"targetAIScore" = "目標 AI 分數";
+"humanizationEngine" = "人性化引擎";
+"translationRoundTrip" = "翻譯來回";
+"selectedRewriteModel" = "所選改寫模型";
+"automaticRoundsHelp" = "每輪檢查 AI 分數，直到達到目標、連續三輪未降低最佳分數，或按下停止。持續改善時不限制輪數，並保留分數最低的結果。每輪使用所選引擎，可能消耗服務商額度。";
+"manualRoundsHelp" = "選擇固定的人性化輪數，或關閉人性化。兩種模式均可用已下載的偵測器評分。";
+"aiDetector" = "AI 偵測器";
+"detectorEngine" = "偵測引擎";
+"detectorScoreHelp" = "分數估計 AI 風格特徵，不能證明作者身分或寫作品質。分數越低，AI 特徵越少。這些偵測器僅支援至少 50 個單字的英語文字。";
+"detectorDownloadHelp" = "需要此 Mac 已安裝 Python 3.10–3.13。下載會安裝獨立推論環境和模型權重，之後評分完全在本機離線執行。";
+"license" = "授權條款";
+"detectorRemoveHelp" = "從此 Mac 移除此偵測器的模型權重？之後可重新下載。";
+"removingDetector" = "正在移除偵測器…";
+"detectorShowError" = "查看下載錯誤…";
+"preparingDetector" = "正在準備執行環境並開始下載…";
+"detectorNotReady" = "請先在設定 → 人性化 → AI 偵測器中選擇並下載偵測器，再使用自動檢查。";
+"detectorPythonMissing" = "請安裝 Python 3.10–3.13，然後重試下載偵測器。";
+"detectorRunnerMissing" = "缺少偵測器執行腳本。請重新安裝 FineText。";
+"detectorInvalidScore" = "偵測器傳回無效分數。";
+"detectorUnsupportedText" = "AI 評分需要至少 50 個單字的英語文字。";
+"detectorFailure" = "AI 偵測器失敗：%@";
+"detectorUnavailable" = "無法取得 AI 分數：%@";
+"checkingAIScore" = "正在檢查 AI 分數…";
+"humanizingRound" = "正在人性化 · 第 %lld 輪";
+"humanizationStopped" = "人性化已停止：%@";
+"aiScoreValue" = "AI 分數：%@/100";
+"initialRewriteScore" = "初始改寫分數";
+"finalAIScore" = "最終 AI 分數";
+"completedRounds" = "已完成輪數";
+"aiTargetReached" = "已達到目標";
+"aiTargetNotReached" = "尚未達到目標 · 已保留最佳結果";
+
+"nllbInvalidOutput" = "NLLB 傳回無效的翻譯張量。";
+
+"nllbOutputLimit" = "NLLB 已達翻譯長度限制，請嘗試較短的段落或其他翻譯模型。";
+
+"removingTranslationModel" = "正在移除翻譯模型…";
+
+/* Detector download stages */
+"detectorRuntime" = "推論執行環境";
+"detectorRuntimeNotInstalled" = "未安裝";
+"detectorRuntimePreparing" = "正在設定…";
+"detectorCheckingPython" = "正在尋找相容的 Python…";
+"detectorCreatingRuntime" = "正在建立推論執行環境…";
+"detectorInstallingDependencies" = "正在下載並安裝執行環境套件…";
+"detectorVerifyingRuntime" = "正在驗證推論執行環境…";
+"detectorDownloadingModel" = "正在下載偵測器模型…";
+"detectorCancelling" = "正在取消下載…";
+"detectorModelReady" = "偵測器模型已下載並就緒";
+
+"refinementChangeLegend" = "新增文字：綠色。刪除文字：紅色並加上刪除線。移動文字：藍色。";

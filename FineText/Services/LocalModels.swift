@@ -92,6 +92,10 @@ struct DownloadProgress: Equatable, Sendable {
   private var sampleBytes: Int64?
   private var sampleTime: ContinuousClock.Instant?
 
+  init(totalBytes: Int64 = 0) {
+    self.totalBytes = totalBytes
+  }
+
   var fraction: Double? { totalBytes > 1 ? min(Double(completedBytes) / Double(totalBytes), 1) : nil }
 
   /// Progress arrives every ~100 ms; the speed is averaged over windows of at least 0.5 s

@@ -182,7 +182,7 @@ extension View {
 /// Attached to each presentation surface so downloads remain visible above native sheets.
 private struct ModelDownloadOverlay: ViewModifier {
   @Environment(LocalModelStore.self) private var store
-  @Environment(TranslateGemmaManager.self) private var gemma
+  @Environment(TranslationModelManager.self) private var gemma
 
   private var isDownloading: Bool { !store.downloads.isEmpty || gemma.isDownloading }
   private var cardHeight: CGFloat {
@@ -191,7 +191,17 @@ private struct ModelDownloadOverlay: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .disabled(isDownloading)
+      .disabled(isDownloading || gemma.isRemoving)
+      .overlay {
+        if gemma.isRemoving {
+          ZStack {
+            Color.black.opacity(0.18).ignoresSafeArea()
+            ProgressView(LocalizableKey.removingTranslationModel.string)
+              .padding(24)
+              .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+          }
+        }
+      }
       .overlay {
         if isDownloading {
           GeometryReader { geometry in
@@ -204,7 +214,7 @@ private struct ModelDownloadOverlay: ViewModifier {
                     downloadCard(id: id, progress: store.downloads[id]) { store.cancel(id) }
                   }
                   if case .downloading(let progress) = gemma.state {
-                    downloadCard(id: gemma.downloadingModel?.id ?? TranslateGemmaModel.default.id, progress: progress) {
+                    downloadCard(id: gemma.downloadingModel?.id ?? TranslationModel.default.id, progress: progress) {
                       gemma.cancel()
                     }
                   }

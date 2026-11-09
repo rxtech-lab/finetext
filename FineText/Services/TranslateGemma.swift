@@ -6,24 +6,27 @@ import MLXLMCommon
 import NaturalLanguage
 import Tokenizers
 
-/// A TranslateGemma checkpoint converted for MLX.
-struct TranslateGemmaModel: Hashable, Identifiable, Sendable {
+/// Translation checkpoints supported by the humanizer.
+struct TranslationModel: Hashable, Identifiable, Sendable {
   let id: String
   let name: String
   let size: String
 
+  var isNLLB: Bool { id.hasPrefix("Xenova/nllb-") }
+
   static let all = [
-    TranslateGemmaModel(id: "mlx-community/translategemma-4b-it-4bit", name: "TranslateGemma 4B", size: "≈ 3 GB"),
-    TranslateGemmaModel(id: "mlx-community/translategemma-12b-it-4bit", name: "TranslateGemma 12B", size: "≈ 8 GB"),
-    TranslateGemmaModel(id: "mlx-community/translategemma-27b-it-4bit", name: "TranslateGemma 27B", size: "≈ 16 GB"),
+    TranslationModel(id: "mlx-community/translategemma-4b-it-4bit", name: "TranslateGemma 4B", size: "≈ 3 GB"),
+    TranslationModel(id: "mlx-community/translategemma-12b-it-4bit", name: "TranslateGemma 12B", size: "≈ 8 GB"),
+    TranslationModel(id: "mlx-community/translategemma-27b-it-4bit", name: "TranslateGemma 27B", size: "≈ 16 GB"),
+    TranslationModel(id: NLLB.repository, name: "Meta NLLB-200 600M", size: "≈ 1.34 GB"),
   ]
   static let `default` = all[0]
 
-  static func named(_ id: String?) -> TranslateGemmaModel {
+  static func named(_ id: String?) -> TranslationModel {
     all.first { $0.id == id } ?? .default
   }
 
-  static func fromDefaults() -> TranslateGemmaModel {
+  static func fromDefaults() -> TranslationModel {
     named(UserDefaults.standard.string(forKey: DefaultsKey.gemmaModel))
   }
 }
@@ -34,10 +37,10 @@ enum TranslateGemmaError: LocalizedError {
   var errorDescription: String? { LocalizableKey.translategemmaReturnedNoText.string }
 }
 
-/// Runs TranslateGemma in-process on Apple silicon with MLX Swift.
+/// Routes translation to MLX TranslateGemma or the local Meta NLLB runtime.
 /// The weights are not bundled; they are downloaded from Hugging Face from Settings.
-actor TranslateGemma {
-  static let shared = TranslateGemma()
+actor TranslationEngine {
+  static let shared = TranslationEngine()
 
   /// Unload the weights after this long without a translation to give the memory back.
   private static let idleUnloadDelay: Duration = .seconds(300)
@@ -48,26 +51,32 @@ actor TranslateGemma {
   // MARK: Download management
 
   /// The local snapshot folder when every file of the model is on disk, otherwise nil.
-  func localSnapshot(_ model: TranslateGemmaModel) async -> URL? {
-    await MLXHub.localSnapshot(model.id)
+  func localSnapshot(_ model: TranslationModel) async -> URL? {
+    if model.isNLLB { return await NLLB.shared.localSnapshot(model.id) }
+    return await MLXHub.localSnapshot(model.id)
   }
 
-  func isInstalled(_ model: TranslateGemmaModel) async -> Bool {
+  func isInstalled(_ model: TranslationModel) async -> Bool {
     await localSnapshot(model) != nil
   }
 
-  func download(_ model: TranslateGemmaModel, progress: @MainActor @Sendable @escaping (Int64, Int64) -> Void) async throws {
-    try await MLXHub.download(model.id, progress: progress)
+  func download(_ model: TranslationModel, progress: @MainActor @Sendable @escaping (Int64, Int64) -> Void) async throws {
+    if model.isNLLB {
+      try await NLLB.shared.download(model.id, progress: progress)
+    } else {
+      try await MLXHub.download(model.id, progress: progress)
+    }
   }
 
-  func remove(_ model: TranslateGemmaModel) throws {
+  func remove(_ model: TranslationModel) async throws {
+    if model.isNLLB { try await NLLB.shared.remove(model.id); return }
     if loaded?.id == model.id { unload() }
     try MLXHub.remove(model.id)
   }
 
   // MARK: Model lifetime
 
-  private func container(for model: TranslateGemmaModel) async throws -> ModelContainer {
+  private func container(for model: TranslationModel) async throws -> ModelContainer {
     if let loaded, loaded.id == model.id { return loaded.container }
     unload()
     guard let folder = await localSnapshot(model) else { throw MLXHubError.notDownloaded }
@@ -109,7 +118,7 @@ actor TranslateGemma {
     """
   }
 
-  func translate(_ text: String, from source: Language, to target: Language, model: TranslateGemmaModel) async throws -> String {
+  func translate(_ text: String, from source: Language, to target: Language, model: TranslationModel) async throws -> String {
     idleTask?.cancel()
     defer { scheduleIdleUnload() }
     let container = try await container(for: model)
@@ -141,9 +150,12 @@ actor TranslateGemma {
 
   /// Round-trips text through a pivot language to break up LLM phrasing patterns.
   func humanize(
-    _ text: String, rounds: Int, pivot preferred: Language, model: TranslateGemmaModel,
-    progress: @MainActor @Sendable (Int) -> Void
+    _ text: String, rounds: Int, pivot preferred: Language, model: TranslationModel,
+    progress: @MainActor @Sendable @escaping (Int) -> Void
   ) async throws -> String {
+    if model.isNLLB {
+      return try await NLLB.shared.humanize(text, rounds: rounds, pivot: preferred, model: model, progress: progress)
+    }
     let source = Self.detectLanguage(text)
     let pivot = source.code == preferred.code ? (source.code == "en" ? Language.japanese : .english) : preferred
     var current = text
@@ -232,8 +244,8 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
 
 // MARK: - Settings state
 
-/// Settings-side state for the downloadable TranslateGemma model.
-@MainActor @Observable final class TranslateGemmaManager {
+/// Settings-side state for the selected downloadable translation model.
+@MainActor @Observable final class TranslationModelManager {
   enum State: Equatable {
     case unknown, checking, notInstalled, installed
     case downloading(DownloadProgress)
@@ -241,29 +253,31 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
   }
 
   var state: State = .unknown
+  private(set) var isRemoving = false
+  private(set) var toast: Toast?
   private var task: Task<Void, Never>?
   private var downloadID: UUID?
-  private(set) var downloadingModel: TranslateGemmaModel?
+  private(set) var downloadingModel: TranslationModel?
 
   var isDownloading: Bool { if case .downloading = state { true } else { false } }
 
   func refresh() {
-    guard !isDownloading else { return }
+    guard !isDownloading, !isRemoving else { return }
     state = .checking
-    let model = TranslateGemmaModel.fromDefaults()
+    let model = TranslationModel.fromDefaults()
     Task {
-      let installed = await TranslateGemma.shared.isInstalled(model)
-      guard state == .checking, model == TranslateGemmaModel.fromDefaults() else { return }
+      let installed = await TranslationEngine.shared.isInstalled(model)
+      guard state == .checking, model == TranslationModel.fromDefaults() else { return }
       state = installed ? .installed : .notInstalled
     }
   }
 
   func download() {
-    guard !isDownloading else { return }
+    guard !isDownloading, !isRemoving else { return }
     let downloadID = UUID()
     self.downloadID = downloadID
     state = .downloading(DownloadProgress())
-    let model = TranslateGemmaModel.fromDefaults()
+    let model = TranslationModel.fromDefaults()
     downloadingModel = model
     task = Task {
       defer {
@@ -274,7 +288,7 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
         }
       }
       do {
-        try await TranslateGemma.shared.download(model) { completed, total in
+        try await TranslationEngine.shared.download(model) { completed, total in
           guard self.downloadID == downloadID else { return }
           self.update(completed: completed, total: total)
         }
@@ -310,16 +324,31 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
   }
 
   func remove() {
+    guard !isDownloading, !isRemoving else { return }
+    isRemoving = true
     state = .checking
-    let model = TranslateGemmaModel.fromDefaults()
+    let model = TranslationModel.fromDefaults()
     Task {
       do {
-        try await TranslateGemma.shared.remove(model)
+        try await TranslationEngine.shared.remove(model)
+        isRemoving = false
+        Haptics.success()
+        show(Toast(message: LocalizableKey.removedModel.format(model.name), symbol: "trash"))
+        refresh()
       } catch {
+        isRemoving = false
         state = .failed(error.localizedDescription)
-        return
+        Haptics.failure()
+        show(Toast(message: error.localizedDescription, symbol: "exclamationmark.triangle", isError: true))
       }
-      refresh()
+    }
+  }
+
+  private func show(_ value: Toast) {
+    toast = value
+    Task {
+      try? await Task.sleep(for: .seconds(4))
+      if toast?.id == value.id { toast = nil }
     }
   }
 }

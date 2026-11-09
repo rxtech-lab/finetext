@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Security
+import RxAgentSDK
 
 // MARK: - Keychain
 
@@ -54,6 +55,12 @@ enum Keychain {
   static let codexTextModel = RemoteModel(id: "codex-text", generatesImages: false, generatesText: true)
   static let codexTextRef = ModelRef(providerID: codexProvider.id, modelID: codexTextModel.id)
 
+  private(set) var claudeCode: ClaudeCodeInstall?
+  private(set) var detectingClaudeCode = false
+  static let claudeCodeProvider = Provider(id: UUID(uuidString: "C1A0DE00-0000-4000-8000-000000000001")!, name: "Claude Code", baseURL: "")
+  static let claudeCodeTextModel = RemoteModel(id: "claude-code-text", generatesImages: false, generatesText: true)
+  static let claudeCodeTextRef = ModelRef(providerID: claudeCodeProvider.id, modelID: claudeCodeTextModel.id)
+
   static let presets: [Provider] = [
     Provider(name: "OpenAI", baseURL: "https://api.openai.com/v1"),
     Provider(name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1"),
@@ -72,6 +79,7 @@ enum Keychain {
     }
     Task { await refreshAll() }
     Task { await detectCodex() }
+    Task { await detectClaudeCode() }
   }
 
   func detectCodex() async {
@@ -79,13 +87,56 @@ enum Keychain {
     detectingCodex = true
     codex = await CodexLocator.locate()
     detectingCodex = false
+    await refreshCLIModels(Self.codexProvider.id)
   }
+
+  func detectClaudeCode() async {
+    guard !detectingClaudeCode else { return }
+    detectingClaudeCode = true
+    defer { detectingClaudeCode = false }
+    claudeCode = await ClaudeCodeLocator.locate()
+    await refreshCLIModels(Self.claudeCodeProvider.id)
+  }
+
+  func agentClient(for ref: ModelRef) throws -> any AgentClient {
+    if isCodex(ref) {
+      guard let codex else { throw CodexError.notInstalled }
+      return AgentTextSession.codex(codex)
+    }
+    guard let claudeCode else { throw ClaudeCodeError.notInstalled }
+    return AgentTextSession.claude(claudeCode)
+  }
+
+  private(set) var cliModelNames: [UUID: [String: String]] = [:]
+
+  func refreshCLIModels(_ id: UUID) async {
+    guard !loading.contains(id) else { return }
+    let ref = ModelRef(providerID: id, modelID: "")
+    guard let client = try? agentClient(for: ref) else { return }
+    loading.insert(id)
+    defer { loading.remove(id) }
+    let options = await client.availableModels()
+    var seen = Set<String>()
+    let unique = options.filter { !$0.id.isEmpty && seen.insert($0.id).inserted && CLIModels.explicitModel($0.id) != nil }
+    models[id] = unique.map { RemoteModel(id: $0.id, generatesImages: false, generatesText: true) }
+    cliModelNames[id] = Dictionary(uniqueKeysWithValues: unique.map { ($0.id, $0.displayName) })
+    persist()
+  }
+
+  func modelName(_ ref: ModelRef) -> String {
+    if (isCodex(ref) || isClaudeCode(ref)) && CLIModels.explicitModel(ref.modelID) == nil {
+      return LocalizableKey.cliDefaultModel.string
+    }
+    return cliModelNames[ref.providerID]?[ref.modelID] ?? ref.modelID
+  }
+
+  func isClaudeCode(_ ref: ModelRef) -> Bool { ref.providerID == Self.claudeCodeProvider.id }
 
   func isCodex(_ ref: ModelRef) -> Bool { ref.providerID == Self.codexProvider.id }
 
   /// True when at least one source can serve this kind of model (user providers, Codex, or local MLX models for text).
   func hasSources(for kind: ModelKind) -> Bool {
-    !providers.isEmpty || codex != nil || (kind == .text && !local.models.isEmpty)
+    !providers.isEmpty || codex != nil || (kind == .text && (claudeCode != nil || !local.models.isEmpty))
   }
 
   private func persist() {
@@ -96,6 +147,7 @@ enum Keychain {
 
   func provider(_ id: UUID) -> Provider? {
     if id == Self.codexProvider.id { return codex == nil ? nil : Self.codexProvider }
+    if id == Self.claudeCodeProvider.id { return claudeCode == nil ? nil : Self.claudeCodeProvider }
     return providers.first { $0.id == id }
   }
   func apiKey(for id: UUID) -> String { Keychain.get(account: id.uuidString) }
@@ -154,7 +206,10 @@ enum Keychain {
   func models(for id: UUID, kind: ModelKind) -> [RemoteModel] {
     if id == Self.codexProvider.id {
       guard codex != nil else { return [] }
-      return [kind == .image ? Self.codexImageModel : Self.codexTextModel]
+      return kind == .image ? [Self.codexImageModel] : [Self.codexTextModel] + (models[id] ?? [])
+    }
+    if id == Self.claudeCodeProvider.id {
+      return kind == .text && claudeCode != nil ? [Self.claudeCodeTextModel] + (models[id] ?? []) : []
     }
     if id == Provider.localID {
       return kind == .text ? local.models.map { RemoteModel(id: $0.id, generatesImages: false, generatesText: true) } : []
@@ -163,7 +218,10 @@ enum Keychain {
   }
 
   func displayName(_ ref: ModelRef) -> String {
-    if isCodex(ref) { return "Codex" }
+    if isClaudeCode(ref) || isCodex(ref) {
+      let provider = isCodex(ref) ? "Codex" : "Claude Code"
+      return CLIModels.explicitModel(ref.modelID) == nil ? provider : "\(modelName(ref)) · \(provider)"
+    }
     let name = ref.modelID.split(separator: "/").last.map(String.init) ?? ref.modelID
     if ref.isLocal { return "\(name) · \(Provider.localName)" }
     guard providers.count > 1, let provider = provider(ref.providerID) else { return name }

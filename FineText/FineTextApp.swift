@@ -7,8 +7,9 @@ import SwiftUI
   @State private var providers: ProviderStore
   @State private var preferences: Preferences
   @State private var workspace: Workspace
-  @State private var gemma = TranslateGemmaManager()
+  @State private var gemma = TranslationModelManager()
   @State private var updater = AppUpdater()
+  @State private var detector = AIDetectorManager()
   private let container: ModelContainer
 
   init() {
@@ -41,6 +42,7 @@ import SwiftUI
         .environment(providers.local)
         .environment(preferences)
         .environment(gemma)
+        .environment(detector)
         .environment(updater)
     }
   }

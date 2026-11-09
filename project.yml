@@ -3,8 +3,14 @@ options:
   developmentLanguage: en
   bundleIdPrefix: app.rxlab
   deploymentTarget:
-    macOS: '15.0'
+    macOS: '26.0'
 packages:
+  ONNXRuntime:
+    url: https://github.com/microsoft/onnxruntime-swift-package-manager
+    exactVersion: 1.24.2
+  RxAgentSDK:
+    url: https://github.com/rxtech-lab/RxAgentSDK
+    revision: 5f2eba0a2f55d1a4181f4a82a6046f3a8445310a
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.10.1
@@ -41,9 +47,15 @@ targets:
     platform: macOS
     sources:
       - path: FineText
+        excludes:
+          - "**/__pycache__"
+          - "**/*.pyc"
       - path: AppIcon.icon
         buildPhase: resources
     dependencies:
+      - package: ONNXRuntime
+        product: onnxruntime
+      - package: RxAgentSDK
       - package: Sparkle
       - package: MLXSwiftLM
         product: MLXLLM
@@ -53,6 +65,8 @@ targets:
         product: MLX
       - package: SwiftHuggingFace
         product: HuggingFace
+      - package: SwiftTransformers
+        product: Hub
       - package: SwiftTransformers
         product: Tokenizers
     settings:

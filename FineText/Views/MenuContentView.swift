@@ -20,6 +20,7 @@ struct MenuContentView: View {
       }
     }
     .frame(width: 440, height: 640)
+    .background(Color(nsColor: .windowBackgroundColor))
     .animation(.snappy(duration: 0.25), value: workspace.route)
     .overlay(alignment: .bottom) { ToastOverlay() }
   }
@@ -188,14 +189,28 @@ struct RewriteSection: View {
           }
           Divider()
         }
-        ForEach(Platform.allCases) { platform in
+        ForEach(Platform.menuPlatforms) { platform in
           Menu {
-            ModelMenuItems(kind: .text, purpose: .rewrite) { workspace.addRewrite(platform: platform, model: $0) }
-          } label: {
-            if platform == preferences.lastPlatform {
-              Label(platform.title, systemImage: "checkmark")
+            if platform.variants.isEmpty {
+              ModelMenuItems(kind: .text, purpose: .rewrite) { workspace.addRewrite(platform: platform, model: $0) }
             } else {
-              Text(platform.title)
+              ForEach(platform.variants) { variant in
+                Menu {
+                  ModelMenuItems(kind: .text, purpose: .rewrite) { workspace.addRewrite(platform: variant, model: $0) }
+                } label: {
+                  if variant == preferences.lastPlatform {
+                    Label(variant.variantTitle, systemImage: "checkmark")
+                  } else {
+                    Text(variant.variantTitle)
+                  }
+                }
+              }
+            }
+          } label: {
+            if platform == preferences.lastPlatform || platform.variants.contains(where: { $0 == preferences.lastPlatform }) {
+              Label(platform.menuTitle, systemImage: "checkmark")
+            } else {
+              Text(platform.menuTitle)
             }
           }
         }
@@ -540,10 +555,10 @@ struct ModelMenuItems: View {
         }
       }
       if providers.codex != nil {
-        let ref = kind == .image ? ProviderStore.codexImageRef : ProviderStore.codexTextRef
-        Section(LocalizableKey.local.string) {
-          pickButton("Codex", ref: ref, selected: ref == last)
-        }
+        cliMenu(ProviderStore.codexProvider, last: last)
+      }
+      if kind == .text, providers.claudeCode != nil {
+        cliMenu(ProviderStore.claudeCodeProvider, last: last)
       }
       if kind == .text {
         let local = providers.models(for: Provider.localID, kind: .text)
@@ -568,6 +583,23 @@ struct ModelMenuItems: View {
             pickButton(model.id, ref: ref, selected: ref == last)
           }
         }
+      }
+    }
+  }
+
+  private func cliMenu(_ provider: Provider, last: ModelRef?) -> some View {
+    Menu(provider.name) {
+      ForEach(providers.models(for: provider.id, kind: kind)) { model in
+        let ref = ModelRef(providerID: provider.id, modelID: model.id)
+        pickButton(providers.modelName(ref), ref: ref, selected: ref == last)
+      }
+      if kind == .text {
+        Divider()
+        Button(LocalizableKey.refreshModels.string) {
+          Haptics.tap()
+          Task { await providers.refreshCLIModels(provider.id) }
+        }
+        .disabled(providers.loading.contains(provider.id))
       }
     }
   }

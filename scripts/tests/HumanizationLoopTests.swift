@@ -1,0 +1,103 @@
+import Foundation
+
+// Keep this test executable independent of AppKit, model downloads, and paid providers.
+enum DefaultsKey {
+  static let humanizationMode = "humanizationMode"
+  static let humanizeRounds = "humanizeRounds"
+}
+enum AIDetectorError: Error { case notReady, emptyText }
+
+@main struct HumanizationLoopTests {
+  @MainActor static func main() async throws {
+    func expect(_ value: Bool, _ message: String) {
+      precondition(value, message)
+    }
+    let suite = "HumanizationTests-\(UUID())"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    defaults.set(0, forKey: DefaultsKey.humanizeRounds)
+    expect(HumanizationMode.selected(in: defaults) == .off, "Migrate disabled humanizer")
+    defaults.set(3, forKey: DefaultsKey.humanizeRounds)
+    expect(HumanizationMode.selected(in: defaults) == .manual, "Migrate fixed rounds")
+    defaults.set("automatic", forKey: DefaultsKey.humanizationMode)
+    expect(HumanizationMode.selected(in: defaults) == .automatic, "Persist automatic mode")
+
+    var updates = 0
+    let unlimited = try await HumanizationLoop.run(
+      text: "0", mode: .automatic, rounds: 1, target: 20,
+      score: { 100 - Double($0)! * 2 },
+      refine: { _, round in String(round) }, update: { _ in updates += 1 }
+    )
+    expect(unlimited.rounds == 40 && unlimited.score == 20 && unlimited.text == "40", "No hidden round cap")
+    expect(updates == 41, "Score initial text and every completed round")
+
+    let satisfied = try await HumanizationLoop.run(
+      text: "already good", mode: .automatic, rounds: 3, target: 20,
+      score: { _ in 10 }, refine: { _, _ in fatalError("Already met target") }, update: { _ in }
+    )
+    expect(satisfied.rounds == 0, "Avoid unnecessary round trips")
+
+    let unchanged = try await HumanizationLoop.run(
+      text: "original", mode: .automatic, rounds: 1, target: 20,
+      score: { _ in 80 }, refine: { _, round in "candidate \(round)" }, update: { _ in }
+    )
+    expect(unchanged.rounds == 3 && unchanged.text == "original" && unchanged.score == 80,
+           "Three equal scores stop automatic checking and preserve the original")
+
+    let plateauScores = [90.0, 60, 70, 80, 75]
+    let plateau = try await HumanizationLoop.run(
+      text: "0", mode: .automatic, rounds: 1, target: 20,
+      score: { plateauScores[Int($0)!] }, refine: { _, round in String(round) }, update: { _ in }
+    )
+    expect(plateau.rounds == 4 && plateau.text == "1" && plateau.score == 60,
+           "Worse scores count as no improvement, including partial recovery above the best")
+
+    let resetScores = [90.0, 80, 85, 80, 70, 75, 72, 70]
+    let reset = try await HumanizationLoop.run(
+      text: "0", mode: .automatic, rounds: 1, target: 20,
+      score: { resetScores[Int($0)!] }, refine: { _, round in String(round) }, update: { _ in }
+    )
+    expect(reset.rounds == 7 && reset.text == "4" && reset.score == 70,
+           "A new best score resets the three-round streak")
+
+    let fixed = try await HumanizationLoop.run(
+      text: "original", mode: .manual, rounds: 5, target: 20,
+      score: { _ in 80 }, refine: { _, round in String(round) }, update: { _ in }
+    )
+    expect(fixed.rounds == 5, "Fixed-round mode retains the requested round count")
+
+    let values = [90.0, 30, 70, 60]
+    let manual = try await HumanizationLoop.run(
+      text: "0", mode: .manual, rounds: 3, target: 0,
+      score: { values[Int($0)!] }, refine: { _, round in String(round) }, update: { _ in }
+    )
+    expect(manual.rounds == 3 && manual.text == "1" && manual.score == 30, "Keep best when later rounds regress")
+    let unscored = try await HumanizationLoop.run(
+      text: "0", mode: .manual, rounds: 2, target: 0,
+      score: nil, refine: { _, round in String(round) }, update: { _ in }
+    )
+    expect(unscored.text == "2" && unscored.score == nil, "Manual mode works without a detector")
+    do {
+      _ = try await HumanizationLoop.run(text: "0", mode: .automatic, rounds: 3, target: 20,
+        score: nil, refine: { text, _ in text }, update: { _ in })
+      fatalError("Automatic mode must require a detector")
+    } catch AIDetectorError.notReady {}
+
+    var last: HumanizationLoop.Result?
+    let task = Task { @MainActor in
+      try await HumanizationLoop.run(text: "0", mode: .automatic, rounds: 1, target: 0,
+        score: { 90 - min(80, Double($0)!) },
+        refine: { _, round in
+          try await Task.sleep(for: .milliseconds(1))
+          return String(round)
+        }, update: { last = $0 })
+    }
+    while (last?.rounds ?? 0) < 8 { try await Task.sleep(for: .milliseconds(1)) }
+    task.cancel()
+    do { _ = try await task.value; fatalError("Cancellation must escape") } catch is CancellationError {}
+    let stopped = last!.rounds
+    try await Task.sleep(for: .milliseconds(10))
+    expect(last!.rounds == stopped && last!.score != nil, "Stop retains last best result without late updates")
+    print("Humanization loop tests passed: migration, 40 rounds, target, three-round plateau, streak reset, regression, manual, cancellation.")
+  }
+}
