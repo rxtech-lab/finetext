@@ -17,6 +17,7 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case showAfterRefinement
   case postVariant
   case commentVariant
+  case chatVariant
   case replyVariant
   case threadVariant
   case customPlatforms
@@ -33,10 +34,27 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case customPlatformSaved
   case customPlatformDeleted
   case history
+  case costUnavailable
+  case costTrackingHint
+  case usageCosts
+  case currentSession
+  case allTime
+  case recordedTotal
+  case recordedCost
+  case unpricedRequests
+  case noRecordedCosts
+  case historyTitle
+  case searchHistory
+  case noHistoryResults
+  case summarizingHistory
+  case historyLoadFailed
+  case today
+  case yesterday
   case settings
   case checkForUpdates
   case quitFinetext
   case clearThisSession
+  case newThread
   case clear
   case startsANewSessionTheCurrentOneStaysInHistory
   case rewriteAll
@@ -102,6 +120,9 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case automaticallyCheckForUpdates
   case version
   case updatesAreAvailableInReleaseBuildsOnly
+  case privacy
+  case shareAnonymousUsageAnalytics
+  case analyticsDescription
   case status
   case location
   case detectAgain

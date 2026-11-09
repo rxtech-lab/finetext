@@ -372,3 +372,28 @@
 "detectorModelReady" = "检测器模型已下载并就绪";
 
 "refinementChangeLegend" = "新增文本：绿色。删除文本：红色并带删除线。移动文本：蓝色。";
+
+"searchHistory" = "搜索历史记录";
+"noHistoryResults" = "没有匹配的会话";
+"summarizingHistory" = "正在生成历史标题…";
+"historyLoadFailed" = "无法加载历史记录，请重试。";
+"today" = "今天";
+"yesterday" = "昨天";
+
+"costUnavailable" = "费用未知";
+"costTrackingHint" = "记录的美元费用包含重新生成、翻译和历史标题。≈ 表示按供应商价格估算。未定价请求和旧活动不计入总额；不含订阅费及本地计算成本。";
+"usageCosts" = "用量与费用";
+"currentSession" = "当前会话";
+"allTime" = "全部时间";
+"recordedTotal" = "已记录总额（美元）";
+"recordedCost" = "已记录费用（美元）";
+"unpricedRequests" = "%d 次请求没有美元价格，总额不完整。";
+"noRecordedCosts" = "暂无费用记录";
+"historyTitle" = "历史标题";
+
+"chatVariant" = "聊天";
+
+"newThread" = "新建会话";
+"privacy" = "隐私";
+"shareAnonymousUsageAnalytics" = "共享匿名使用数据";
+"analyticsDescription" = "仅发送你使用的功能和模型，绝不发送你的文字、图片或 API 密钥。";

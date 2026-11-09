@@ -16,6 +16,8 @@ struct SettingsView: View {
     }
     .frame(width: 580, height: 460)
     .modelDownloadOverlay()
+    .onAppear { AppAnalytics.screen("settings_\(tab.rawValue)") }
+    .onChange(of: tab) { AppAnalytics.screen("settings_\(tab.rawValue)") }
   }
 }
 
@@ -25,6 +27,7 @@ struct GeneralSettingsView: View {
   @Environment(AppUpdater.self) private var updater
   @Environment(Preferences.self) private var preferences
   @State private var showClaudeCode = false
+  @AppStorage(DefaultsKey.analyticsEnabled) private var analyticsEnabled = true
 
   var body: some View {
     @Bindable var updater = updater
@@ -58,6 +61,11 @@ struct GeneralSettingsView: View {
         if !updater.isConfigured {
           Text(LocalizableKey.updatesAreAvailableInReleaseBuildsOnly.string).font(.caption).foregroundStyle(.secondary)
         }
+      }
+      Section(LocalizableKey.privacy.string) {
+        Toggle(LocalizableKey.shareAnonymousUsageAnalytics.string, isOn: $analyticsEnabled)
+          .onChange(of: analyticsEnabled) { AppAnalytics.setEnabled(analyticsEnabled) }
+        Text(LocalizableKey.analyticsDescription.string).font(.caption).foregroundStyle(.secondary)
       }
     }
     .formStyle(.grouped)
@@ -452,6 +460,10 @@ struct HumanizerSettingsView: View {
       ModelDownloadSheet(model: TranslationModel.named(model))
     }
     .sheet(isPresented: $showDetector) { AIDetectorSettingsSheet() }
+    .onChange(of: mode) { AppAnalytics.log(.settingChanged, ["setting": "humanization_mode", "value": mode]) }
+    .onChange(of: engine) { AppAnalytics.log(.settingChanged, ["setting": "humanization_engine", "value": engine.rawValue]) }
+    .onChange(of: model) { AppAnalytics.log(.settingChanged, ["setting": "translation_model", "value": model]) }
+    .onChange(of: pivot) { AppAnalytics.log(.settingChanged, ["setting": "pivot_language", "value": pivot]) }
   }
 
   @ViewBuilder private var statusRow: some View {

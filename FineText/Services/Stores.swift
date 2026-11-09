@@ -160,6 +160,7 @@ enum Keychain {
     }
     Keychain.set(apiKey, account: provider.id.uuidString)
     persist()
+    AppAnalytics.log(.providerSaved, ["provider_type": AppAnalytics.providerType(baseURL: provider.baseURL)])
     Task { await refresh(provider.id) }
   }
 
@@ -169,6 +170,7 @@ enum Keychain {
     errors[provider.id] = nil
     Keychain.delete(account: provider.id.uuidString)
     persist()
+    AppAnalytics.log(.providerDeleted, ["provider_type": AppAnalytics.providerType(baseURL: provider.baseURL)])
   }
 
   /// Whether a saved model reference can still run (its provider exists or the local model is downloaded).

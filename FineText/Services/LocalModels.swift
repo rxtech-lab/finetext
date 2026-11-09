@@ -250,6 +250,7 @@ struct LocalModel: Codable, Identifiable, Hashable, Sendable {
         models.removeAll { $0.id == id }
         models.insert(LocalModel(id: id, sizeBytes: size), at: 0)
         persist()
+        AppAnalytics.log(.modelDownloaded, ["model_kind": "local_llm", "model": id])
         Haptics.success()
       } catch is CancellationError {
       } catch let error as URLError where error.code == .cancelled {
@@ -274,6 +275,7 @@ struct LocalModel: Codable, Identifiable, Hashable, Sendable {
     try MLXHub.remove(id)
     models.removeAll { $0.id == id }
     persist()
+    AppAnalytics.log(.modelRemoved, ["model_kind": "local_llm", "model": id])
   }
 }
 

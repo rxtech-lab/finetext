@@ -295,6 +295,7 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
         try Task.checkCancellation()
         guard self.downloadID == downloadID else { return }
         state = .installed
+        AppAnalytics.log(.modelDownloaded, ["model_kind": "translation", "model": model.id])
         Haptics.success()
       } catch is CancellationError {
         if self.downloadID == downloadID { state = .notInstalled }
@@ -332,6 +333,7 @@ private struct TokenizerBridge: MLXLMCommon.Tokenizer {
       do {
         try await TranslationEngine.shared.remove(model)
         isRemoving = false
+        AppAnalytics.log(.modelRemoved, ["model_kind": "translation", "model": model.id])
         Haptics.success()
         show(Toast(message: LocalizableKey.removedModel.format(model.name), symbol: "trash"))
         refresh()

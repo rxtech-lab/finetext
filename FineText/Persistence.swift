@@ -8,6 +8,8 @@ import SwiftData
   var createdAt = Date.now
   var updatedAt = Date.now
   var originalText = ""
+  var summaryTitle = ""
+  var summarySource: String?
   @Relationship(deleteRule: .cascade, inverse: \RewriteItem.session) var rewrites: [RewriteItem] = []
   @Relationship(deleteRule: .cascade, inverse: \TranslationItem.session) var translations: [TranslationItem] = []
   @Relationship(deleteRule: .cascade, inverse: \ImageItem.session) var images: [ImageItem] = []
@@ -20,7 +22,17 @@ import SwiftData
 
   var isEmpty: Bool { originalText.trimmed.isEmpty && rewrites.isEmpty && translations.isEmpty && images.isEmpty }
 
+  /// Bounded source keeps history title requests small, including image-only sessions.
+  var titleSource: String {
+    ([String(originalText.prefix(6000))]
+      + sortedRewrites.map { String($0.output.prefix(1000)) }
+      + sortedTranslations.map { String($0.output.prefix(500)) }
+      + sortedImages.map { String($0.instruction.prefix(500)) })
+      .joined(separator: "\n\n").prefix(12000).description
+  }
+
   var title: String {
+    if summarySource == titleSource, !summaryTitle.isEmpty { return summaryTitle }
     let line = originalText.trimmed.components(separatedBy: .newlines).first ?? ""
     return line.isEmpty ? LocalizableKey.untitledSession.string : String(line.prefix(80))
   }
@@ -133,9 +145,32 @@ import SwiftData
   var canUndoRefinement: Bool { previousImageData != nil }
 }
 
+/// Independent ledger: deleting an output or a session never erases recorded spend.
+@Model final class GenerationCharge {
+  var id = UUID()
+  var createdAt = Date.now
+  var sessionID: UUID
+  var itemID: UUID
+  var modelID: String
+  var kind: String
+  var costUSD: Double?
+  var costSource: String?
+  var inputTokens: Int?
+  var outputTokens: Int?
+  var cachedTokens: Int?
+  var estimated = false
+
+  init(sessionID: UUID, itemID: UUID, modelID: String, kind: String) {
+    self.sessionID = sessionID
+    self.itemID = itemID
+    self.modelID = modelID
+    self.kind = kind
+  }
+}
+
 enum Persistence {
   static func makeContainer() -> ModelContainer {
-    let schema = Schema([RefinementSession.self, RewriteItem.self, TranslationItem.self, ImageItem.self])
+    let schema = Schema([RefinementSession.self, RewriteItem.self, TranslationItem.self, ImageItem.self, GenerationCharge.self])
     do {
       return try ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema))
     } catch {

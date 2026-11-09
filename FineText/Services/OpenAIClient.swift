@@ -112,19 +112,30 @@ struct OpenAIClient: Sendable {
         outputs.insert("text")
       }
     }
-    return RemoteModel(id: id, generatesImages: outputs.contains("image"), generatesText: outputs.contains("text"))
+    var pricing: ModelPricing?
+    if let prices = object["pricing"] as? [String: Any],
+       let input = Double(String(describing: prices["prompt"] ?? prices["input"] ?? "")),
+       let output = Double(String(describing: prices["completion"] ?? prices["output"] ?? "")),
+       input.isFinite, output.isFinite, input >= 0, output >= 0 {
+      pricing = ModelPricing(input: input, output: output,
+                             cachedInput: Double(String(describing: prices["input_cache_read"] ?? "")))
+    }
+    return RemoteModel(id: id, generatesImages: outputs.contains("image"), generatesText: outputs.contains("text"), pricing: pricing)
   }
 
   // MARK: Chat
 
   /// Streams a chat completion, reporting each delta. Falls back to a plain JSON body when the
   /// endpoint ignores `stream`.
-  func streamChat(model: String, messages: [ChatMessage], onDelta: @MainActor @Sendable (String) -> Void) async throws -> String {
-    let body: [String: Any] = [
+  func streamChat(model: String, messages: [ChatMessage], onUsage: @MainActor @Sendable (GenerationUsage) -> Void = { _ in }, onDelta: @MainActor @Sendable (String) -> Void) async throws -> String {
+    var body: [String: Any] = [
       "model": model,
       "stream": true,
       "messages": messages.map { ["role": $0.role, "content": $0.content] },
     ]
+    if ["api.openai.com", "openrouter.ai", "ai-gateway.vercel.sh"].contains(baseURL.host ?? "") {
+      body["stream_options"] = ["include_usage": true]
+    }
     let (bytes, response) = try await URLSession.shared.bytes(for: request("chat/completions", method: "POST", body: body))
     try await Self.check(response) {
       var data = Data()
@@ -137,6 +148,7 @@ struct OpenAIClient: Sendable {
       var data = Data()
       for try await byte in bytes { data.append(byte) }
       let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+      if let json, let usage = GenerationUsage.parse(json, isVercelGateway: baseURL.host == "ai-gateway.vercel.sh") { await onUsage(usage) }
       let choices = json?["choices"] as? [[String: Any]]
       full = ((choices?.first?["message"] as? [String: Any])?["content"] as? String) ?? ""
       await onDelta(full)
@@ -148,6 +160,7 @@ struct OpenAIClient: Sendable {
         if payload == "[DONE]" { break }
         guard let data = payload.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+        if let usage = GenerationUsage.parse(json, isVercelGateway: baseURL.host == "ai-gateway.vercel.sh") { await onUsage(usage) }
         if let error = json["error"] as? [String: Any] {
           throw APIError.http(500, (error["message"] as? String) ?? LocalizableKey.streamError.string)
         }
@@ -165,7 +178,7 @@ struct OpenAIClient: Sendable {
   // MARK: Images
 
   /// `transparent` asks GPT Image models for a PNG with an alpha channel.
-  func generateImage(model: String, prompt: String, size: String, transparent: Bool = false) async throws -> Data {
+  func generateImage(model: String, prompt: String, size: String, transparent: Bool = false, onUsage: @MainActor @Sendable (GenerationUsage) -> Void = { _ in }) async throws -> Data {
     var body: [String: Any] = ["model": model, "prompt": prompt, "n": 1, "size": size]
     if model.lowercased().contains("dall-e") { body["response_format"] = "b64_json" }
     if transparent {
@@ -174,12 +187,14 @@ struct OpenAIClient: Sendable {
     }
     let (data, response) = try await URLSession.shared.data(for: request("images/generations", method: "POST", body: body, timeout: 600))
     try await Self.check(response) { data }
+    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let usage = GenerationUsage.parse(json, isVercelGateway: baseURL.host == "ai-gateway.vercel.sh") { await onUsage(usage) }
     return try await Self.decodeImage(data)
   }
 
   /// Edits an existing image (`POST /images/edits`, multipart). Throws `APIError.http` with 404/405/415/501
   /// when the endpoint or model doesn't support edits; see `isEditUnsupported`.
-  func editImage(model: String, image: Data, prompt: String, size: String, transparent: Bool = false) async throws -> Data {
+  func editImage(model: String, image: Data, prompt: String, size: String, transparent: Bool = false, onUsage: @MainActor @Sendable (GenerationUsage) -> Void = { _ in }) async throws -> Data {
     let boundary = "FineText-\(UUID().uuidString)"
     var body = Data()
     func append(_ string: String) { body.append(Data(string.utf8)) }
@@ -203,6 +218,8 @@ struct OpenAIClient: Sendable {
     request.httpBody = body
     let (data, response) = try await URLSession.shared.data(for: request)
     try await Self.check(response) { data }
+    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let usage = GenerationUsage.parse(json, isVercelGateway: baseURL.host == "ai-gateway.vercel.sh") { await onUsage(usage) }
     return try await Self.decodeImage(data)
   }
 

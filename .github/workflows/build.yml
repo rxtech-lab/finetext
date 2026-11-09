@@ -25,6 +25,8 @@ jobs:
         run: python3 scripts/test-claude-code.py
       - name: Test AI detector and automatic humanization
         run: python3 scripts/test-humanization.py
+      - name: Test history paging and generation costs
+        run: python3 scripts/test-history-costs.py
       - name: Build (unsigned)
         run: xcodebuild -project FineText.xcodeproj -scheme FineText -configuration Release -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO build
   notarization:
