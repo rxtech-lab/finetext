@@ -39,7 +39,7 @@ test("offers a direct asset download or an honest release fallback", async ({ pa
   if (await download.count()) {
     await expect(download).toHaveAttribute("href", /^https:\/\/github.com\/rxtech-lab\/finetext\/releases\/download\/[^/]+\/FineText.dmg$/);
   } else {
-    await expect(page.getByText("The first release is on its way.")).toBeVisible();
+    await expect(page.getByText("Download details are temporarily unavailable.")).toBeVisible();
     await expect(page.locator(".hero-actions a")).toHaveAttribute("href", "https://github.com/rxtech-lab/finetext/releases");
   }
   await page.screenshot({ path: testInfo.outputPath("desktop.png"), fullPage: true });

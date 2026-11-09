@@ -5,7 +5,7 @@ const en = {
   eyebrow: "YOUR WORDS, FINELY TUNED",
   featuresLink: "Features", download: "Download for Mac", github: "View on GitHub",
   requirements: "macOS 26+ · Apple silicon", releaseNotes: "Release notes",
-  unavailable: "The first release is on its way.", unavailableDetail: "Visit GitHub for release updates. The latest macOS download will appear here when it’s ready.",
+  unavailable: "Download details are temporarily unavailable.", unavailableDetail: "Download the latest Mac release directly from GitHub.",
   language: "Language", chooseLanguage: "Choose your language", close: "Close", remembered: "Your choice will be remembered on this device.",
   preview: "A small space for your next big idea.", previewNote: "An illustration of the FineText workflow",
   original: "YOUR DRAFT", draft: "we’ve been working on something new. excited to finally share it with everyone next week!",
@@ -28,7 +28,7 @@ export const messages: Record<Locale, Messages> = {
   "zh-CN": {
     title: "字句更出色，表达更像你。", description: "在 Mac 菜单栏的一方小天地，改写、翻译、生成图片。保留你的风格，让每一句都恰到好处。",
     eyebrow: "用心打磨你的文字", featuresLink: "功能", download: "下载 Mac 版", github: "在 GitHub 上查看", requirements: "macOS 26 及以上 · Apple 芯片", releaseNotes: "更新说明",
-    unavailable: "首个版本即将发布。", unavailableDetail: "前往 GitHub 关注发布动态。macOS 版本准备就绪后，下载链接会自动出现在这里。",
+    unavailable: "暂时无法获取下载信息。", unavailableDetail: "请前往 GitHub 下载最新的 Mac 版本。",
     language: "语言", chooseLanguage: "选择语言", close: "关闭", remembered: "我们会在此设备上记住你的选择。",
     preview: "小小空间，装下你的下一个好想法。", previewNote: "FineText 工作流程示意", original: "你的草稿", draft: "最近一直在做一个新东西，好期待下周终于能分享给大家！",
     rewrite: "改写", translate: "翻译", image: "图片", platform: "LinkedIn · 亲切", result: "新想法正在成形。我们迫不及待，想在下周与你分享这段时间用心打造的成果。", ready: "思路更清晰，依然是你的声音。",
@@ -44,7 +44,7 @@ export const messages: Record<Locale, Messages> = {
   "zh-TW": {
     title: "字句更出色，表達更像你。", description: "在 Mac 選單列的一方小天地，改寫、翻譯、生成圖片。保留你的風格，讓每一句都恰到好處。",
     eyebrow: "用心打磨你的文字", featuresLink: "功能", download: "下載 Mac 版", github: "在 GitHub 上查看", requirements: "macOS 26 以上 · Apple 晶片", releaseNotes: "版本說明",
-    unavailable: "首個版本即將推出。", unavailableDetail: "前往 GitHub 關注發布動態。macOS 版本準備就緒後，下載連結會自動顯示在這裡。",
+    unavailable: "暫時無法取得下載資訊。", unavailableDetail: "請前往 GitHub 下載最新的 Mac 版本。",
     language: "語言", chooseLanguage: "選擇語言", close: "關閉", remembered: "我們會在此裝置上記住你的選擇。",
     preview: "小小空間，裝下你的下一個好點子。", previewNote: "FineText 工作流程示意", original: "你的草稿", draft: "最近一直在做一個新東西，好期待下週終於能分享給大家！",
     rewrite: "改寫", translate: "翻譯", image: "圖片", platform: "LinkedIn · 親切", result: "新點子正在成形。我們迫不及待，想在下週與你分享這段時間用心打造的成果。", ready: "思路更清晰，依然是你的聲音。",
@@ -60,7 +60,7 @@ export const messages: Record<Locale, Messages> = {
   "zh-HK": {
     title: "字句更出色，表達更似你。", description: "在 Mac 選單列的一方小天地，改寫、翻譯、生成圖片。保留你的風格，讓每一句都恰到好處。",
     eyebrow: "用心打磨你的文字", featuresLink: "功能", download: "下載 Mac 版", github: "在 GitHub 上查看", requirements: "macOS 26 或以上 · Apple 晶片", releaseNotes: "更新內容",
-    unavailable: "首個版本即將推出。", unavailableDetail: "前往 GitHub 留意發佈消息。macOS 版本準備好後，下載連結就會自動顯示在這裏。",
+    unavailable: "暫時無法取得下載資訊。", unavailableDetail: "請前往 GitHub 下載最新的 Mac 版本。",
     language: "語言", chooseLanguage: "選擇語言", close: "關閉", remembered: "我們會在這部裝置上記住你的選擇。",
     preview: "小小空間，容納你的下一個好點子。", previewNote: "FineText 工作流程示意", original: "你的草稿", draft: "最近一直在做一個新項目，好期待下星期終於可以跟大家分享！",
     rewrite: "改寫", translate: "翻譯", image: "圖片", platform: "LinkedIn · 親切", result: "新點子正在成形。我們急不及待，想在下星期跟你分享這段時間用心打造的成果。", ready: "思路更清晰，依然是你的聲音。",

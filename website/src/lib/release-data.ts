@@ -3,8 +3,8 @@ export interface Release {
   version: string;
   url: string;
   downloadUrl: string;
-  size: number;
-  publishedAt: string;
+  size: number | null;
+  publishedAt: string | null;
 }
 interface GitHubRelease {
   tag_name: string;
