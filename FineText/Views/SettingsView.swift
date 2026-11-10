@@ -26,18 +26,33 @@ struct SettingsView: View {
 struct GeneralSettingsView: View {
   @Environment(AppUpdater.self) private var updater
   @Environment(Preferences.self) private var preferences
+  @Environment(PresetStore.self) private var presets
   @State private var showClaudeCode = false
+  @State private var presetStatus: Toast?
   @AppStorage(DefaultsKey.analyticsEnabled) private var analyticsEnabled = true
 
   var body: some View {
     @Bindable var updater = updater
     Form {
       Section(LocalizableKey.defaultTonePerPlatform.string) {
-        ForEach(Platform.allCases) { platform in
-          Picker(platform.title, selection: Binding(get: { preferences.tone(for: platform) }, set: { preferences.setTone($0, for: platform) })) {
+        ForEach(presets.entries) { entry in
+          Picker(entry.title, selection: Binding(get: { preferences.tone(for: entry.preset) }, set: { preferences.setTone($0, for: entry.preset) })) {
             ForEach(Tone.allCases) { Text($0.title).tag($0) }
           }
         }
+      }
+      Section(LocalizableKey.presets.string) {
+        LabeledContent(LocalizableKey.presetsVersion.string, value: presets.catalog.version)
+        LabeledContent(LocalizableKey.presetsLastChecked.string) {
+          if let date = presets.lastChecked {
+            Text(date, format: .relative(presentation: .named))
+          } else {
+            Text(LocalizableKey.never.string)
+          }
+        }
+        Button(LocalizableKey.updateNow.string, action: updatePresets)
+          .disabled(presets.isRefreshing || PresetStore.configuredURL == nil)
+        Text(LocalizableKey.presetsDescription.string).font(.caption).foregroundStyle(.secondary)
       }
       Section(LocalizableKey.images.string) {
         LabeledContent(LocalizableKey.quickSaveFolder.string) {
@@ -70,6 +85,60 @@ struct GeneralSettingsView: View {
     }
     .formStyle(.grouped)
     .sheet(isPresented: $showClaudeCode) { ClaudeCodeSetupSheet() }
+    .overlay(alignment: .bottom) {
+      if presets.isRefreshing {
+        StatusOverlay(Toast(message: LocalizableKey.updatingPresets.string, symbol: "arrow.triangle.2.circlepath"), progress: true)
+      } else if let presetStatus {
+        StatusOverlay(presetStatus).id(presetStatus.id)
+      }
+    }
+    .animation(.spring(duration: 0.3), value: presets.isRefreshing)
+    .animation(.spring(duration: 0.3), value: presetStatus)
+  }
+
+  private func updatePresets() {
+    Haptics.tap()
+    presetStatus = nil
+    Task {
+      let changed = await presets.refresh()
+      let status: Toast
+      if let error = presets.lastError {
+        status = Toast(message: LocalizableKey.presetsUpdateFailed.format(error), symbol: "xmark.octagon", isError: true)
+        Haptics.failure()
+      } else {
+        status = Toast(message: changed ? LocalizableKey.presetsUpdated.string : LocalizableKey.presetsUpToDate.string, symbol: "checkmark.circle")
+        Haptics.success()
+      }
+      presetStatus = status
+      try? await Task.sleep(for: .seconds(2.5))
+      if presetStatus == status { presetStatus = nil }
+    }
+  }
+}
+
+/// A transient status capsule shown over the Settings form.
+private struct StatusOverlay: View {
+  let toast: Toast
+  var progress = false
+
+  init(_ toast: Toast, progress: Bool = false) {
+    self.toast = toast
+    self.progress = progress
+  }
+
+  var body: some View {
+    HStack(spacing: 8) {
+      if progress { ProgressView().controlSize(.small) } else { Image(systemName: toast.symbol) }
+      Text(toast.message).lineLimit(2)
+    }
+    .font(.callout)
+    .foregroundStyle(toast.isError ? .red : .primary)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .background(.regularMaterial, in: Capsule())
+    .shadow(radius: 6, y: 2)
+    .padding(.bottom, 16)
+    .transition(.move(edge: .bottom).combined(with: .opacity))
   }
 }
 

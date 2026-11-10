@@ -14,24 +14,16 @@ struct CustomPlatformsSheet: View {
           ContentUnavailableView(LocalizableKey.noCustomPlatforms.string, systemImage: "slider.horizontal.3",
                                  description: Text(LocalizableKey.customPlatformsHint.string))
         } else {
-          List(preferences.customPlatforms) { platform in
-            Button {
-              Haptics.tap()
-              editing = platform
-            } label: {
-              HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                  Text(platform.name).font(.headline)
-                  Text(platform.instruction).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+          List {
+            ForEach(groups, id: \.folder) { group in
+              Section {
+                ForEach(group.platforms) { row($0) }
+              } header: {
+                if let folder = group.folder {
+                  Label(CustomPlatform.path(folder).joined(separator: " › "), systemImage: "folder")
                 }
-                Spacer()
-                Image(systemName: "chevron.right").foregroundStyle(.secondary)
               }
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .padding(.vertical, 4)
           }
         }
       }
@@ -73,6 +65,34 @@ struct CustomPlatformsSheet: View {
       }
     }
   }
+
+  /// Top-level presets first, then one section per submenu path.
+  private var groups: [(folder: String?, platforms: [CustomPlatform])] {
+    let platforms = preferences.customPlatforms
+    let root = platforms.filter { $0.folder == nil }
+    let folders = Set(platforms.compactMap(\.folder)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    return (root.isEmpty ? [] : [(nil, root)]) + folders.map { folder in (folder, platforms.filter { $0.folder == folder }) }
+  }
+
+  private func row(_ platform: CustomPlatform) -> some View {
+    Button {
+      Haptics.tap()
+      editing = platform
+    } label: {
+      HStack {
+        VStack(alignment: .leading, spacing: 4) {
+          Text(platform.name).font(.headline)
+          Text(platform.instruction).font(.callout).foregroundStyle(.secondary).lineLimit(2)
+        }
+        Spacer()
+        Image(systemName: "chevron.right").foregroundStyle(.secondary)
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .padding(.vertical, 4)
+  }
 }
 
 struct CustomPlatformEditorSheet: View {
@@ -89,6 +109,9 @@ struct CustomPlatformEditorSheet: View {
   }
 
   private var isExisting: Bool { preferences.customPlatforms.contains { $0.id == platform.id } }
+  private var folder: Binding<String> {
+    Binding(get: { platform.folder ?? "" }, set: { platform.folder = $0.isEmpty ? nil : $0 })
+  }
 
   var body: some View {
     NavigationStack {
@@ -96,6 +119,29 @@ struct CustomPlatformEditorSheet: View {
         Form {
           TextField(LocalizableKey.platformName.string, text: $platform.name)
             .focused($nameFocused)
+          HStack {
+            TextField(LocalizableKey.customPlatformFolder.string, text: folder,
+                      prompt: Text(LocalizableKey.customPlatformFolderPrompt.string))
+            let existing = CustomPlatform.folders(in: preferences.customPlatforms)
+            if !existing.isEmpty {
+              Menu {
+                Button(LocalizableKey.topLevel.string) { platform.folder = nil }
+                Divider()
+                ForEach(existing, id: \.self) { path in
+                  Button(CustomPlatform.path(path).joined(separator: " › ")) {
+                    Haptics.tap()
+                    platform.folder = path
+                  }
+                }
+              } label: {
+                Image(systemName: "folder")
+              }
+              .menuStyle(.borderlessButton)
+              .fixedSize()
+              .help(LocalizableKey.chooseExistingMenu.string)
+            }
+          }
+          Text(LocalizableKey.customPlatformFolderHint.string).font(.caption).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
@@ -135,7 +181,7 @@ struct CustomPlatformEditorSheet: View {
         }
       }
     }
-    .frame(width: 420, height: 500)
+    .frame(width: 420, height: 560)
     .onAppear { nameFocused = true }
     .confirmationDialog(LocalizableKey.deleteCustomPlatform.string, isPresented: $confirmDelete) {
       Button(LocalizableKey.delete.string, role: .destructive) {

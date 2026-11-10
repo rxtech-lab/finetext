@@ -1,284 +1,73 @@
 import Foundation
 
-// MARK: - Platforms & tones
+// MARK: - Presets & tones
 
-enum Platform: String, CaseIterable, Codable, Identifiable, Sendable {
-  case x, xReply, xThread, reddit, redditComment, linkedin, linkedinComment, linkedinChat, blog, message
-  case youtubeComment, youtubeTitle, youtubeDescription
-  case productHunt, productHuntComment, productHuntReply, productHuntTagline, productHuntDescription, productHuntMakerComment
-
-  var id: String { rawValue }
-
-  var title: String {
-    switch self {
-    case .x, .xReply, .xThread: "X · \(variantTitle)"
-    case .reddit, .redditComment: "Reddit · \(variantTitle)"
-    case .linkedin, .linkedinComment, .linkedinChat: "LinkedIn · \(variantTitle)"
-    case .youtubeComment, .youtubeTitle, .youtubeDescription: "YouTube · \(variantTitle)"
-    case .productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment:
-      "Product Hunt · \(variantTitle)"
-    case .blog: LocalizableKey.blogPost.string
-    case .message: LocalizableKey.message.string
-    }
-  }
-
-  /// Top-level entries; variants are selected in a submenu before the model.
-  static let menuPlatforms: [Platform] = [.x, .reddit, .linkedin, .youtubeComment, .productHunt, .blog, .message]
-
-  var variants: [Platform] {
-    switch self {
-    case .x, .xReply, .xThread: [.x, .xReply, .xThread]
-    case .reddit, .redditComment: [.reddit, .redditComment]
-    case .linkedin, .linkedinComment, .linkedinChat: [.linkedin, .linkedinComment, .linkedinChat]
-    case .youtubeComment, .youtubeTitle, .youtubeDescription: [.youtubeComment, .youtubeTitle, .youtubeDescription]
-    case .productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment:
-      [.productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment]
-    default: []
-    }
-  }
-
-  var menuTitle: String {
-    switch self {
-    case .x, .xReply, .xThread: "X"
-    case .reddit, .redditComment: "Reddit"
-    case .linkedin, .linkedinComment, .linkedinChat: "LinkedIn"
-    case .youtubeComment, .youtubeTitle, .youtubeDescription: "YouTube"
-    case .productHunt, .productHuntComment, .productHuntReply, .productHuntTagline, .productHuntDescription, .productHuntMakerComment:
-      "Product Hunt"
-    default: title
-    }
-  }
-
-  var variantTitle: String {
-    switch self {
-    case .x, .reddit, .linkedin, .productHunt: LocalizableKey.postVariant.string
-    case .xReply, .productHuntReply: LocalizableKey.replyVariant.string
-    case .xThread: LocalizableKey.threadVariant.string
-    case .redditComment, .linkedinComment, .youtubeComment, .productHuntComment: LocalizableKey.commentVariant.string
-    case .youtubeTitle: LocalizableKey.titleVariant.string
-    case .youtubeDescription, .productHuntDescription: LocalizableKey.descriptionVariant.string
-    case .productHuntTagline: LocalizableKey.taglineVariant.string
-    case .productHuntMakerComment: LocalizableKey.makerCommentVariant.string
-    case .linkedinChat: LocalizableKey.chatVariant.string
-    default: title
-    }
-  }
-
-  /// Stable English label used in model instructions.
-  var promptTitle: String {
-    switch self {
-    case .x: "X Post"
-    case .xReply: "X Reply"
-    case .xThread: "X Thread"
-    case .reddit: "Reddit Post"
-    case .redditComment: "Reddit Comment"
-    case .linkedin: "LinkedIn Post"
-    case .linkedinComment: "LinkedIn Comment"
-    case .linkedinChat: "LinkedIn Chat"
-    case .youtubeComment: "YouTube Comment"
-    case .youtubeTitle: "YouTube Title"
-    case .youtubeDescription: "YouTube Description"
-    case .productHunt: "Product Hunt Post"
-    case .productHuntComment: "Product Hunt Comment"
-    case .productHuntReply: "Product Hunt Reply"
-    case .productHuntTagline: "Product Hunt Tagline"
-    case .productHuntDescription: "Product Hunt Description"
-    case .productHuntMakerComment: "Product Hunt Maker Comment"
-    case .blog: "Blog Post"
-    case .message: "Message"
-    }
-  }
-
-  var symbol: String {
-    switch self {
-    case .x, .xReply, .xThread: "xmark"
-    case .reddit, .redditComment: "bubble.left.and.bubble.right"
-    case .linkedin: "briefcase"
-    case .linkedinComment: "text.bubble"
-    case .linkedinChat: "message"
-    case .youtubeComment: "text.bubble"
-    case .youtubeTitle, .youtubeDescription: "play.rectangle"
-    case .productHunt, .productHuntTagline, .productHuntDescription: "sparkles"
-    case .productHuntComment, .productHuntMakerComment: "text.bubble"
-    case .productHuntReply: "arrowshape.turn.up.left"
-    case .blog: "doc.richtext"
-    case .message: "message"
-    }
-  }
-
-  var defaultTone: Tone {
-    switch self {
-    case .x, .xReply, .xThread: .witty
-    case .reddit, .redditComment: .casual
-    case .linkedin: .professional
-    case .linkedinComment, .linkedinChat: .natural
-    case .youtubeComment: .casual
-    case .youtubeTitle: .concise
-    case .youtubeDescription: .informative
-    case .productHunt: .enthusiastic
-    case .productHuntComment, .productHuntReply: .natural
-    case .productHuntTagline: .concise
-    case .productHuntDescription: .informative
-    case .productHuntMakerComment: .friendly
-    case .blog: .storytelling
-    case .message: .natural
-    }
-  }
-
-  /// Soft character limit shown in the editor; nil means no limit.
-  var characterLimit: Int? {
-    switch self {
-    case .x, .xReply: 280
-    default: nil
-    }
-  }
-
-  var guidelines: String {
-    switch self {
-    case .x:
-      """
-      - A single post of at most 280 characters (count carefully).
-      - Lead with the most interesting idea. Punchy, scannable.
-      - At most 1-2 relevant hashtags, only if they add value. No hashtag walls.
-      """
-    case .xReply:
-      """
-      - A single reply of at most 280 characters (count carefully).
-      - Respond directly and naturally to the point in the source; keep the author's intended meaning.
-      - No title, thread numbering, or hashtags. Do not invent context about the post being replied to.
-      """
-    case .xThread:
-      """
-      - A thread of connected X posts, each at most 280 characters including its numbering.
-      - Separate posts with a blank line and number them 1/N, 2/N, and so on.
-      - Open with a clear hook. Give each post a complete thought and keep a logical progression.
-      - Use only as many posts as needed. Preserve the source facts; do not pad or invent details.
-      """
-    case .reddit:
-      """
-      - Start with a line "Title: <title>" followed by a blank line and the body.
-      - Conversational and authentic, like a community member, not a marketer.
-      - No hashtags. Markdown is allowed. Invite discussion naturally at the end.
-      """
-    case .redditComment:
-      """
-      - A Reddit comment, not a standalone post: no title or "Title:" line.
-      - Conversational, authentic, and relevant to the point in the source, like a community member.
-      - Preserve the author's intent. Do not invent context about the parent post or other commenters.
-      - No hashtags or promotional language. Markdown is allowed; keep the response focused.
-      """
-    case .linkedin:
-      """
-      - Open with a strong one-line hook, then short paragraphs of 1-3 sentences.
-      - Share a takeaway or lesson; keep it credible and specific.
-      - End with a light question or call to action and 3-5 hashtags on the last line.
-      """
-    case .linkedinComment:
-      """
-      - A comment on a LinkedIn post, not a standalone post: no title, opening hook, or hashtags.
-      - Keep it concise, thoughtful and conversational, with a professional but natural tone.
-      - Preserve the author's point and contribute something specific rather than generic praise.
-      - Do not invent facts, personal experiences, or context about the parent post.
-      - No promotional pitch or forced question at the end.
-      """
-    case .linkedinChat:
-      """
-      - A private LinkedIn chat message, not a public post or email.
-      - Use natural, concise language suitable for a professional conversation, with short paragraphs.
-      - Preserve the author's intent, relationship and level of familiarity; do not invent prior contact.
-      - No title, hashtags, public call to action, unsolicited sales pitch, or formal email sign-off.
-      - Avoid canned greetings and networking clichés. Keep any request direct and low-pressure.
-      """
-    case .youtubeComment:
-      """
-      - A single YouTube comment: concise, conversational, and relevant to the source.
-      - Preserve the author's point and tone. Do not invent video details, quotes, or context about other commenters.
-      - No title, hashtags, promotional pitch, or generic praise. Output only the comment.
-      """
-    case .youtubeTitle:
-      """
-      - A single concise YouTube video title on one line. Output only the title, without quotes or a label.
-      - Put the main topic first and make the value clear using natural, specific wording.
-      - Preserve the source meaning. Avoid misleading clickbait, exaggerated promises, all caps, and hashtag walls.
-      - Do not invent names, numbers, outcomes, or video content. Do not provide multiple alternatives.
-      """
-    case .youtubeDescription:
-      """
-      - A YouTube video description with a clear opening summary, followed by short, readable paragraphs as needed.
-      - Explain the topic and value using only information in the source. Preserve any supplied links and credits.
-      - Do not invent timestamps, chapters, URLs, sponsors, social handles, or claims about the video.
-      - No title or description label, forced subscription pitch, or hashtag walls. Output only the description.
-      """
-    case .productHunt:
-      """
-      - A Product Hunt launch post: introduce the product, the problem it solves, and who it helps.
-      - Lead with the concrete value, then use short paragraphs for the key features supported by the source.
-      - Keep enthusiasm grounded and invite useful feedback naturally. No hashtag walls or requests for upvotes.
-      - Preserve supplied product names and links. Do not invent features, pricing, metrics, testimonials, or launch status.
-      - Output only the post, without a label or extra alternatives.
-      """
-    case .productHuntComment:
-      """
-      - A concise Product Hunt community comment, responding to the specific point in the source.
-      - Keep it thoughtful and conversational; preserve any feedback or question rather than substituting generic praise.
-      - Do not pretend to have tried the product or invent features, experiences, or a relationship with the maker.
-      - No title, hashtags, promotional pitch, or requests for upvotes. Output only the comment.
-      """
-    case .productHuntReply:
-      """
-      - A direct, conversational reply to a Product Hunt comment or question.
-      - Address the point in the source, preserving the author's role and intent without inventing the parent comment.
-      - Do not invent product capabilities, commitments, roadmap dates, or personal experiences.
-      - Keep it focused and helpful, without a title, hashtags, or requests for upvotes. Output only the reply.
-      """
-    case .productHuntTagline:
-      """
-      - A single short Product Hunt product tagline on one line, without quotes or a label.
-      - State what the product does or its main benefit in plain, specific language; put the core idea first.
-      - Preserve the source meaning. Avoid jargon, vague superlatives, unsupported comparisons, and invented claims.
-      - No hashtags, calls to action, or multiple alternatives. Output only the tagline.
-      """
-    case .productHuntDescription:
-      """
-      - A compact Product Hunt product description explaining what it does, who it helps, and the main benefit.
-      - Use a few clear sentences grounded in the source, prioritizing concrete capabilities over marketing adjectives.
-      - Preserve supplied product names and links. Do not invent features, pricing, integrations, or results.
-      - No title, hashtags, requests for upvotes, or extra alternatives. Output only the description.
-      """
-    case .productHuntMakerComment:
-      """
-      - An introductory Product Hunt maker comment, written in the maker's natural voice.
-      - Use the source to explain why the product was built, the problem it addresses, and what makes it useful.
-      - Use short paragraphs and close with an invitation for questions or specific feedback when appropriate.
-      - Preserve the source's singular or team voice. Do not invent a founder story, users, traction, offers, or roadmap promises.
-      - No title, hashtags, or requests for upvotes. Output only the maker comment.
-      """
-    case .blog:
-      """
-      - Markdown blog post: a "# Title", a short intro, "##" section headings, and a conclusion.
-      - Around 400-900 words, expanding on the original with useful detail but no invented facts.
-      - Clear, readable paragraphs.
-      """
-    case .message:
-      """
-      - A chat message for a messaging app (iMessage, WhatsApp, Telegram, Slack DMs), written the way a real \
-      person texts the people they know.
-      - Natural and spoken: contractions, everyday words, short sentences. It should sound like the author \
-      would say it out loud. Sentence fragments are fine.
-      - No title, no hashtags, no Markdown, no bullet lists, no sign-off or formal greeting, no "I hope this \
-      message finds you well".
-      - Keep it short. Break longer content into a few short lines or paragraphs instead of one block.
-      - Don't sound like an announcement, an email or marketing copy. Only use an emoji if it fits naturally.
-      """
-    }
-  }
-}
+// Built-in rewrite presets come from the cloud catalog (see Services/Presets.swift).
 
 /// Reusable rewrite rules. IDs remain stable when the user renames a preset.
 struct CustomPlatform: Codable, Identifiable, Hashable, Sendable {
   var id = UUID()
   var name: String
   var instruction: String
+  /// Submenu path such as "Work/Clients"; nil keeps the preset at the top level.
+  var folder: String? = nil
+
+  /// Folder names from the outermost submenu inwards.
+  var folderPath: [String] { Self.path(folder ?? "") }
+
+  static func path(_ folder: String) -> [String] {
+    folder.split(separator: "/").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+  }
+
+  /// Canonical "A/B" form, or nil for the top level.
+  static func normalizedFolder(_ folder: String?) -> String? {
+    let path = path(folder ?? "")
+    return path.isEmpty ? nil : path.joined(separator: "/")
+  }
+
+  /// Every folder path in use, including parents, e.g. ["Work", "Work/Clients"].
+  static func folders(in platforms: [CustomPlatform]) -> [String] {
+    Set(platforms.flatMap { platform in
+      platform.folderPath.indices.map { platform.folderPath[...$0].joined(separator: "/") }
+    }).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+  }
+}
+
+/// Custom presets arranged as nested submenus: folders (sorted) first, then presets in saved order.
+enum CustomPlatformNode: Identifiable, Hashable, Sendable {
+  case folder(name: String, path: String, children: [CustomPlatformNode])
+  case platform(CustomPlatform)
+
+  var id: String {
+    switch self {
+    case .folder(_, let path, _): "folder:" + path
+    case .platform(let platform): platform.id.uuidString
+    }
+  }
+
+  func contains(_ id: UUID?) -> Bool {
+    switch self {
+    case .folder(_, _, let children): children.contains { $0.contains(id) }
+    case .platform(let platform): platform.id == id
+    }
+  }
+
+  static func tree(_ platforms: [CustomPlatform], depth: Int = 0, parent: [String] = []) -> [CustomPlatformNode] {
+    var names: [String] = []
+    var grouped: [String: [CustomPlatform]] = [:]
+    var leaves: [CustomPlatformNode] = []
+    for platform in platforms {
+      let path = platform.folderPath
+      guard path.count > depth else { leaves.append(.platform(platform)); continue }
+      if grouped[path[depth]] == nil { names.append(path[depth]) }
+      grouped[path[depth], default: []].append(platform)
+    }
+    let folders = names.sorted { $0.localizedStandardCompare($1) == .orderedAscending }.map { name in
+      CustomPlatformNode.folder(name: name, path: (parent + [name]).joined(separator: "/"),
+                                children: tree(grouped[name]!, depth: depth + 1, parent: parent + [name]))
+    }
+    return folders + leaves
+  }
 }
 
 enum Tone: String, CaseIterable, Codable, Identifiable, Sendable {

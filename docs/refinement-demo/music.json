@@ -1,0 +1,24 @@
+{
+  "title": "FineText \u2014 Gentle Motion",
+  "durationSeconds": 15.0,
+  "sampleRate": 48000,
+  "channels": 2,
+  "musicFootageId": "696FD4CF-88C7-4106-BFC4-F81F4EBA11F7",
+  "sourcePath": "/Users/qiweili/Movies/FineText.rxfilmstudio/Media/Music/65A7D73F-28A4-4F51-8E26-A8456D0BFF31.mp3",
+  "description": "Minimal electronic instrumental cue with warm keys, soft synth plucks and light percussion.",
+  "processing": "15-second cut; loudness normalization target -18 LUFS, -1.5 dBTP; 50 ms fade-in; 1.2 s fade-out.",
+  "files": [
+    "FineText-Gentle-Motion-15s.wav",
+    "FineText-Gentle-Motion-15s.mp3"
+  ],
+  "verification": "720000 stereo frames at 48000 Hz; both formats decode without errors.",
+  "importedFootageId": "900BCEFE-7D37-423A-B3C5-4F0B435F75D5",
+  "sequence": {
+    "id": "72B2F927-E4DA-42FB-B4CE-997CEA70BA26",
+    "track": "A1",
+    "clipId": "523FD937-58B9-4097-B618-C4036DA5A305",
+    "start": 0,
+    "duration": 15,
+    "volume": 1
+  }
+}

@@ -1,0 +1,410 @@
+{
+  "schemaVersion": 1,
+  "version": "ebb2919d80754e9d",
+  "items": [
+    {
+      "type": "menu",
+      "id": "x",
+      "title": {
+        "en": "X"
+      },
+      "children": [
+        {
+          "type": "preset",
+          "id": "x",
+          "title": {
+            "en": "Post",
+            "zh-CN": "帖子",
+            "zh-HK": "貼文",
+            "zh-TW": "貼文"
+          },
+          "promptTitle": "X Post",
+          "template": "- A single post of at most {{ character_limit }} characters (count carefully).\n- Lead with the most interesting idea. Punchy, scannable.\n- At most 1-2 relevant hashtags, only if they add value. No hashtag walls.\n",
+          "symbol": "xmark",
+          "tone": "witty",
+          "characterLimit": 280
+        },
+        {
+          "type": "preset",
+          "id": "xReply",
+          "title": {
+            "en": "Reply",
+            "zh-CN": "回复",
+            "zh-HK": "回覆",
+            "zh-TW": "回覆"
+          },
+          "promptTitle": "X Reply",
+          "template": "- A single reply of at most {{ character_limit }} characters (count carefully).\n- Respond directly and naturally to the point in the source; keep the author's intended meaning.\n- No title, thread numbering, or hashtags. Do not invent context about the post being replied to.\n",
+          "symbol": "xmark",
+          "tone": "witty",
+          "characterLimit": 280
+        },
+        {
+          "type": "preset",
+          "id": "xThread",
+          "title": {
+            "en": "Thread",
+            "zh-CN": "串文",
+            "zh-HK": "串文",
+            "zh-TW": "串文"
+          },
+          "promptTitle": "X Thread",
+          "template": "- A thread of connected X posts, each at most 280 characters including its numbering.\n- Separate posts with a blank line and number them 1/N, 2/N, and so on.\n- Open with a clear hook. Give each post a complete thought and keep a logical progression.\n- Use only as many posts as needed. Preserve the source facts; do not pad or invent details.\n",
+          "symbol": "xmark",
+          "tone": "witty"
+        }
+      ],
+      "symbol": "xmark"
+    },
+    {
+      "type": "menu",
+      "id": "reddit",
+      "title": {
+        "en": "Reddit"
+      },
+      "children": [
+        {
+          "type": "preset",
+          "id": "reddit",
+          "title": {
+            "en": "Post",
+            "zh-CN": "帖子",
+            "zh-HK": "貼文",
+            "zh-TW": "貼文"
+          },
+          "promptTitle": "Reddit Post",
+          "template": "- A Reddit post with a clear, specific title (at most 300 characters) and a body.\n- Conversational and authentic, like a community member, not a marketer.\n- No hashtags. Markdown is allowed. Invite discussion naturally at the end.\n",
+          "symbol": "bubble.left.and.bubble.right",
+          "tone": "casual",
+          "fields": [
+            {
+              "id": "title",
+              "label": {
+                "en": "Title",
+                "zh-CN": "标题",
+                "zh-HK": "標題",
+                "zh-TW": "標題"
+              },
+              "multiline": false,
+              "characterLimit": 300
+            },
+            {
+              "id": "body",
+              "label": {
+                "en": "Body",
+                "zh-CN": "正文",
+                "zh-HK": "內文",
+                "zh-TW": "內文"
+              },
+              "multiline": true
+            }
+          ]
+        },
+        {
+          "type": "preset",
+          "id": "redditComment",
+          "title": {
+            "en": "Comment",
+            "zh-CN": "评论",
+            "zh-HK": "留言",
+            "zh-TW": "留言"
+          },
+          "promptTitle": "Reddit Comment",
+          "template": "- A Reddit comment, not a standalone post: no title or \"Title:\" line.\n- Conversational, authentic, and relevant to the point in the source, like a community member.\n- Preserve the author's intent. Do not invent context about the parent post or other commenters.\n- No hashtags or promotional language. Markdown is allowed; keep the response focused.\n",
+          "symbol": "bubble.left.and.bubble.right",
+          "tone": "casual"
+        }
+      ],
+      "symbol": "bubble.left.and.bubble.right"
+    },
+    {
+      "type": "menu",
+      "id": "linkedin",
+      "title": {
+        "en": "LinkedIn"
+      },
+      "children": [
+        {
+          "type": "preset",
+          "id": "linkedin",
+          "title": {
+            "en": "Post",
+            "zh-CN": "帖子",
+            "zh-HK": "貼文",
+            "zh-TW": "貼文"
+          },
+          "promptTitle": "LinkedIn Post",
+          "template": "- Open with a strong one-line hook, then short paragraphs of 1-3 sentences.\n- Share a takeaway or lesson; keep it credible and specific.\n- End with a light question or call to action and 3-5 hashtags on the last line.\n",
+          "symbol": "briefcase",
+          "tone": "professional"
+        },
+        {
+          "type": "preset",
+          "id": "linkedinComment",
+          "title": {
+            "en": "Comment",
+            "zh-CN": "评论",
+            "zh-HK": "留言",
+            "zh-TW": "留言"
+          },
+          "promptTitle": "LinkedIn Comment",
+          "template": "- A comment on a LinkedIn post, not a standalone post: no title, opening hook, or hashtags.\n- Keep it concise, thoughtful and conversational, with a professional but natural tone.\n- Preserve the author's point and contribute something specific rather than generic praise.\n- Do not invent facts, personal experiences, or context about the parent post.\n- No promotional pitch or forced question at the end.\n",
+          "symbol": "text.bubble",
+          "tone": "natural"
+        },
+        {
+          "type": "preset",
+          "id": "linkedinChat",
+          "title": {
+            "en": "Chat",
+            "zh-CN": "聊天",
+            "zh-HK": "聊天",
+            "zh-TW": "聊天"
+          },
+          "promptTitle": "LinkedIn Chat",
+          "template": "- A private LinkedIn chat message, not a public post or email.\n- Use natural, concise language suitable for a professional conversation, with short paragraphs.\n- Preserve the author's intent, relationship and level of familiarity; do not invent prior contact.\n- No title, hashtags, public call to action, unsolicited sales pitch, or formal email sign-off.\n- Avoid canned greetings and networking clichés. Keep any request direct and low-pressure.\n",
+          "symbol": "message",
+          "tone": "natural"
+        }
+      ],
+      "symbol": "briefcase"
+    },
+    {
+      "type": "menu",
+      "id": "youtube",
+      "title": {
+        "en": "YouTube"
+      },
+      "children": [
+        {
+          "type": "preset",
+          "id": "youtubeComment",
+          "title": {
+            "en": "Comment",
+            "zh-CN": "评论",
+            "zh-HK": "留言",
+            "zh-TW": "留言"
+          },
+          "promptTitle": "YouTube Comment",
+          "template": "- A single YouTube comment: concise, conversational, and relevant to the source.\n- Preserve the author's point and tone. Do not invent video details, quotes, or context about other commenters.\n- No title, hashtags, promotional pitch, or generic praise. Output only the comment.\n",
+          "symbol": "text.bubble",
+          "tone": "casual"
+        },
+        {
+          "type": "preset",
+          "id": "youtubeTitle",
+          "title": {
+            "en": "Title",
+            "zh-CN": "标题",
+            "zh-HK": "標題",
+            "zh-TW": "標題"
+          },
+          "promptTitle": "YouTube Title",
+          "template": "- A single concise YouTube video title on one line. Output only the title, without quotes or a label.\n- Put the main topic first and make the value clear using natural, specific wording.\n- Preserve the source meaning. Avoid misleading clickbait, exaggerated promises, all caps, and hashtag walls.\n- Do not invent names, numbers, outcomes, or video content. Do not provide multiple alternatives.\n",
+          "symbol": "play.rectangle",
+          "tone": "concise"
+        },
+        {
+          "type": "preset",
+          "id": "youtubeDescription",
+          "title": {
+            "en": "Description",
+            "zh-CN": "简介",
+            "zh-HK": "簡介",
+            "zh-TW": "簡介"
+          },
+          "promptTitle": "YouTube Description",
+          "template": "- A YouTube video description with a clear opening summary, followed by short, readable paragraphs as needed.\n- Explain the topic and value using only information in the source. Preserve any supplied links and credits.\n- Do not invent timestamps, chapters, URLs, sponsors, social handles, or claims about the video.\n- No title or description label, forced subscription pitch, or hashtag walls. Output only the description.\n",
+          "symbol": "play.rectangle",
+          "tone": "informative"
+        }
+      ],
+      "symbol": "play.rectangle"
+    },
+    {
+      "type": "menu",
+      "id": "product-hunt",
+      "title": {
+        "en": "Product Hunt"
+      },
+      "children": [
+        {
+          "type": "preset",
+          "id": "productHunt",
+          "title": {
+            "en": "Post",
+            "zh-CN": "帖子",
+            "zh-HK": "貼文",
+            "zh-TW": "貼文"
+          },
+          "promptTitle": "Product Hunt Post",
+          "template": "- A Product Hunt launch post: introduce the product, the problem it solves, and who it helps.\n- Lead with the concrete value, then use short paragraphs for the key features supported by the source.\n- Keep enthusiasm grounded and invite useful feedback naturally. No hashtag walls or requests for upvotes.\n- Preserve supplied product names and links. Do not invent features, pricing, metrics, testimonials, or launch status.\n- Output only the post, without a label or extra alternatives.\n",
+          "symbol": "sparkles",
+          "tone": "enthusiastic"
+        },
+        {
+          "type": "preset",
+          "id": "productHuntComment",
+          "title": {
+            "en": "Comment",
+            "zh-CN": "评论",
+            "zh-HK": "留言",
+            "zh-TW": "留言"
+          },
+          "promptTitle": "Product Hunt Comment",
+          "template": "- A concise Product Hunt community comment, responding to the specific point in the source.\n- Keep it thoughtful and conversational; preserve any feedback or question rather than substituting generic praise.\n- Do not pretend to have tried the product or invent features, experiences, or a relationship with the maker.\n- No title, hashtags, promotional pitch, or requests for upvotes. Output only the comment.\n",
+          "symbol": "text.bubble",
+          "tone": "natural"
+        },
+        {
+          "type": "preset",
+          "id": "productHuntReply",
+          "title": {
+            "en": "Reply",
+            "zh-CN": "回复",
+            "zh-HK": "回覆",
+            "zh-TW": "回覆"
+          },
+          "promptTitle": "Product Hunt Reply",
+          "template": "- A direct, conversational reply to a Product Hunt comment or question.\n- Address the point in the source, preserving the author's role and intent without inventing the parent comment.\n- Do not invent product capabilities, commitments, roadmap dates, or personal experiences.\n- Keep it focused and helpful, without a title, hashtags, or requests for upvotes. Output only the reply.\n",
+          "symbol": "arrowshape.turn.up.left",
+          "tone": "natural"
+        },
+        {
+          "type": "preset",
+          "id": "productHuntTagline",
+          "title": {
+            "en": "Tagline",
+            "zh-CN": "宣传语",
+            "zh-HK": "宣傳語",
+            "zh-TW": "宣傳語"
+          },
+          "promptTitle": "Product Hunt Tagline",
+          "template": "- A single short Product Hunt product tagline on one line, without quotes or a label.\n- State what the product does or its main benefit in plain, specific language; put the core idea first.\n- Preserve the source meaning. Avoid jargon, vague superlatives, unsupported comparisons, and invented claims.\n- No hashtags, calls to action, or multiple alternatives. Output only the tagline.\n",
+          "symbol": "sparkles",
+          "tone": "concise"
+        },
+        {
+          "type": "preset",
+          "id": "productHuntDescription",
+          "title": {
+            "en": "Description",
+            "zh-CN": "简介",
+            "zh-HK": "簡介",
+            "zh-TW": "簡介"
+          },
+          "promptTitle": "Product Hunt Description",
+          "template": "- A compact Product Hunt product description explaining what it does, who it helps, and the main benefit.\n- Use a few clear sentences grounded in the source, prioritizing concrete capabilities over marketing adjectives.\n- Preserve supplied product names and links. Do not invent features, pricing, integrations, or results.\n- No title, hashtags, requests for upvotes, or extra alternatives. Output only the description.\n",
+          "symbol": "sparkles",
+          "tone": "informative"
+        },
+        {
+          "type": "preset",
+          "id": "productHuntMakerComment",
+          "title": {
+            "en": "Maker Comment",
+            "zh-CN": "创作者留言",
+            "zh-HK": "創作者留言",
+            "zh-TW": "創作者留言"
+          },
+          "promptTitle": "Product Hunt Maker Comment",
+          "template": "- An introductory Product Hunt maker comment, written in the maker's natural voice.\n- Use the source to explain why the product was built, the problem it addresses, and what makes it useful.\n- Use short paragraphs and close with an invitation for questions or specific feedback when appropriate.\n- Preserve the source's singular or team voice. Do not invent a founder story, users, traction, offers, or roadmap promises.\n- No title, hashtags, or requests for upvotes. Output only the maker comment.\n",
+          "symbol": "text.bubble",
+          "tone": "friendly"
+        }
+      ],
+      "symbol": "sparkles"
+    },
+    {
+      "type": "menu",
+      "id": "email",
+      "title": {
+        "en": "Email",
+        "zh-CN": "电子邮件",
+        "zh-HK": "電郵",
+        "zh-TW": "電子郵件"
+      },
+      "children": [
+        {
+          "type": "preset",
+          "id": "emailSend",
+          "title": {
+            "en": "Send",
+            "zh-CN": "发送",
+            "zh-HK": "傳送",
+            "zh-TW": "寄送"
+          },
+          "promptTitle": "Email Send",
+          "template": "- A new email ready to send, with a concise, specific subject and the email body.\n- Write the subject in the output language. Use plain text and short, readable paragraphs in the body.\n- Make the purpose and any request clear. Preserve the author's intended tone, facts, names, and supplied links.\n- Use a natural greeting and closing when supported by the source. Do not invent recipient or sender names, signatures, attachments, dates, or commitments.\n- Avoid canned pleasantries, hashtags, and marketing language unless the source calls for them.\n- Output only one email, without commentary, alternatives, or placeholder fields.\n",
+          "symbol": "envelope",
+          "tone": "professional",
+          "fields": [
+            {
+              "id": "subject",
+              "label": {
+                "en": "Subject",
+                "zh-CN": "主题",
+                "zh-HK": "主旨",
+                "zh-TW": "主旨"
+              },
+              "multiline": false
+            },
+            {
+              "id": "body",
+              "label": {
+                "en": "Body",
+                "zh-CN": "正文",
+                "zh-HK": "內文",
+                "zh-TW": "內文"
+              },
+              "multiline": true
+            }
+          ]
+        },
+        {
+          "type": "preset",
+          "id": "emailReply",
+          "title": {
+            "en": "Reply",
+            "zh-CN": "回复",
+            "zh-HK": "回覆",
+            "zh-TW": "回覆"
+          },
+          "promptTitle": "Email Reply",
+          "template": "- An email reply body for an existing conversation. Output only the reply, without a subject line or quoted email history.\n- If the source includes an incoming email and reply notes, use the incoming email as context and rewrite the author's intended response.\n- If the source is only a reply draft, polish it without inventing the incoming email or changing the author's role.\n- Address supplied questions and requests only where the author's response supports an answer; do not invent answers, commitments, availability, attachments, or prior contact.\n- Keep it clear and professional, with short plain-text paragraphs and a natural greeting or closing only when supported by the source.\n- Preserve names, facts, supplied links, and the author's intent. No invented signatures, placeholder fields, commentary, or alternatives.\n",
+          "symbol": "arrowshape.turn.up.left",
+          "tone": "professional"
+        }
+      ],
+      "symbol": "envelope"
+    },
+    {
+      "type": "preset",
+      "id": "blog",
+      "title": {
+        "en": "Blog Post",
+        "zh-CN": "博客文章",
+        "zh-HK": "網誌文章",
+        "zh-TW": "部落格文章"
+      },
+      "promptTitle": "Blog Post",
+      "template": "- Markdown blog post: a \"# Title\", a short intro, \"##\" section headings, and a conclusion.\n- Around 400-900 words, expanding on the original with useful detail but no invented facts.\n- Clear, readable paragraphs.\n",
+      "symbol": "doc.richtext",
+      "tone": "storytelling"
+    },
+    {
+      "type": "preset",
+      "id": "message",
+      "title": {
+        "en": "Message",
+        "zh-CN": "消息",
+        "zh-HK": "訊息",
+        "zh-TW": "訊息"
+      },
+      "promptTitle": "Message",
+      "template": "- A chat message for a messaging app (iMessage, WhatsApp, Telegram, Slack DMs), written the way a real person texts the people they know.\n- Natural and spoken: contractions, everyday words, short sentences. It should sound like the author would say it out loud. Sentence fragments are fine.\n- No title, no hashtags, no Markdown, no bullet lists, no sign-off or formal greeting, no \"I hope this message finds you well\".\n- Keep it short. Break longer content into a few short lines or paragraphs instead of one block.\n- Don't sound like an announcement, an email or marketing copy. Only use an emoji if it fits naturally.\n",
+      "symbol": "message",
+      "tone": "natural"
+    }
+  ]
+}

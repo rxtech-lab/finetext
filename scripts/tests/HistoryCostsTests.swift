@@ -20,7 +20,7 @@ struct TranslationModel { var id = "test"; static let `default` = TranslationMod
       context.insert(session)
       if index == 40 {
         session.summaryTitle = "Saved AI Title"
-        let rewrite = RewriteItem(platform: .x, tone: .natural, model: model)
+        let rewrite = RewriteItem(presetID: "x", tone: .natural, model: model)
         rewrite.output = "Café rewrite needle"
         session.rewrites.append(rewrite)
         let translation = TranslationItem(language: .japanese, model: model, sourceRewriteID: nil)

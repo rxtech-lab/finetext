@@ -1,2 +1,4 @@
 // CI overrides SPARKLE_PUBLIC_KEY with the repository variable at archive time.
 SPARKLE_PUBLIC_KEY =
+// `$()` keeps `//` from starting an xcconfig comment.
+PRESETS_URL = https:/$()/fintext.app/api/presets

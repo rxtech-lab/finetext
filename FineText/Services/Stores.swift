@@ -237,7 +237,8 @@ enum Keychain {
   struct Stored: Codable {
     var customPlatforms: [CustomPlatform]?
     var lastCustomPlatformID: UUID?
-    var lastPlatform: Platform?
+    /// Preset id. Older builds stored the enum raw value, which is the same string.
+    var lastPlatform: String?
     var lastLanguage: String?
     var lastModels: [String: ModelRef] = [:]
     var recentModels: [String: [ModelRef]] = [:]
@@ -260,13 +261,14 @@ enum Keychain {
 
   var customPlatforms: [CustomPlatform] { stored.customPlatforms ?? [] }
   var lastCustomPlatform: CustomPlatform? { customPlatforms.first { $0.id == stored.lastCustomPlatformID } }
-  var lastPlatform: Platform? { stored.lastPlatform }
+  var lastPresetID: String? { stored.lastPlatform }
 
   func saveCustomPlatform(_ platform: CustomPlatform) {
     var platforms = customPlatforms
     var clean = platform
     clean.name = clean.name.trimmed
     clean.instruction = clean.instruction.trimmed
+    clean.folder = CustomPlatform.normalizedFolder(clean.folder)
     guard !clean.name.isEmpty, !clean.instruction.isEmpty else { return }
     if let index = platforms.firstIndex(where: { $0.id == clean.id }) {
       platforms[index] = clean
@@ -289,7 +291,7 @@ enum Keychain {
 
   func tone(for item: RewriteItem) -> Tone {
     stored.tones[item.customPlatformID.map { "custom-" + $0.uuidString } ?? item.platformRaw]
-      ?? (item.isCustomPlatform ? .natural : item.platform.defaultTone)
+      ?? item.defaultTone
   }
 
   func setTone(_ tone: Tone, for item: RewriteItem) {
@@ -298,7 +300,7 @@ enum Keychain {
   var lastLanguage: Language? { stored.lastLanguage.map(Language.named(code:)) }
   func lastModel(_ purpose: Purpose) -> ModelRef? { stored.lastModels[purpose.rawValue] }
   func recentModels(_ purpose: Purpose) -> [ModelRef] { stored.recentModels[purpose.rawValue] ?? [] }
-  func tone(for platform: Platform) -> Tone { stored.tones[platform.rawValue] ?? platform.defaultTone }
+  func tone(for preset: Preset) -> Tone { stored.tones[preset.id] ?? preset.defaultTone }
 
   func remember(_ model: ModelRef, for purpose: Purpose) {
     stored.lastModels[purpose.rawValue] = model
@@ -308,12 +310,12 @@ enum Keychain {
     stored.recentModels[purpose.rawValue] = Array(recent.prefix(4))
   }
 
-  func remember(platform: Platform) {
-    stored.lastPlatform = platform
+  func remember(preset: Preset) {
+    stored.lastPlatform = preset.id
     stored.lastCustomPlatformID = nil
   }
   func remember(language: Language) { stored.lastLanguage = language.code }
-  func setTone(_ tone: Tone, for platform: Platform) { stored.tones[platform.rawValue] = tone }
+  func setTone(_ tone: Tone, for preset: Preset) { stored.tones[preset.id] = tone }
 }
 
 // MARK: - Feedback

@@ -1,2 +1,4 @@
 // Debug builds do not start the Sparkle updater (no public key).
 SPARKLE_PUBLIC_KEY =
+// Rewrite presets from the local website (`bun run dev` in website/).
+PRESETS_URL = http:/$()/localhost:3000/api/presets

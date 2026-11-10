@@ -122,7 +122,6 @@
 "removeModel" = "Remove Model…";
 "removeTheDownloadedTranslategemmaModel" = "Remove the selected translation model?";
 "youCanDownloadItAgainAtAnyTime" = "You can download it again at any time.";
-"blogPost" = "Blog Post";
 "professional" = "Professional";
 "casual" = "Casual";
 "witty" = "Witty";
@@ -213,7 +212,6 @@
 "regeneratingWithChanges" = "This model can't edit images — regenerating with your changes…";
 "checkingTransparency" = "Checking transparency…";
 "removingGreenScreen" = "Removing green screen…";
-"message" = "Message";
 "natural" = "Natural";
 "onThisMac" = "On This Mac";
 "localModels" = "Local Models";
@@ -288,10 +286,6 @@
 "customPlatformDeleted" = "Custom platform deleted";
 
 /* Platform variants */
-"postVariant" = "Post";
-"commentVariant" = "Comment";
-"replyVariant" = "Reply";
-"threadVariant" = "Thread";
 
 "claudeCodeNotInstalled" = "Claude Code is not installed. Install it with `brew install --cask claude-code`.";
 "claudeCodeError" = "Claude Code: %@";
@@ -346,6 +340,8 @@
 "checkingAIScore" = "Checking AI score…";
 "humanizingRound" = "Humanizing · round %lld";
 "humanizationStopped" = "Humanization stopped: %@";
+"humanizationPlateau" = "Stopped after 3 rounds without a lower AI score. Kept the best-scoring text; later drafts may have been different.";
+"bestAIScoreValue" = "Best AI score: %@/100";
 "aiScoreValue" = "AI score: %@/100";
 "initialRewriteScore" = "Initial rewrite score";
 "finalAIScore" = "Final AI score";
@@ -391,13 +387,27 @@
 "noRecordedCosts" = "No recorded costs yet";
 "historyTitle" = "History title";
 
-"chatVariant" = "Chat";
-"titleVariant" = "Title";
-"descriptionVariant" = "Description";
-"taglineVariant" = "Tagline";
-"makerCommentVariant" = "Maker Comment";
 
 "newThread" = "New thread";
 "privacy" = "Privacy";
 "shareAnonymousUsageAnalytics" = "Share anonymous usage analytics";
 "analyticsDescription" = "Sends which features and models you use, never your text, images or API keys.";
+
+"copyField" = "Copy %@";
+"presets" = "Presets";
+"presetsVersion" = "Preset version";
+"presetsLastChecked" = "Last checked";
+"never" = "Never";
+"updateNow" = "Update Now";
+"presetsDescription" = "Platform presets download from fintext.app every 4 hours and stay available offline.";
+"updatingPresets" = "Updating presets…";
+"presetsUpdated" = "Presets updated";
+"presetsUpToDate" = "Presets are up to date";
+"presetsUpdateFailed" = "Couldn’t update presets: %@";
+"presetsNeedNewerApp" = "These presets need a newer version of FineText.";
+"presetsEmpty" = "The preset catalog is empty.";
+"customPlatformFolder" = "Menu";
+"customPlatformFolderPrompt" = "Work/Clients";
+"customPlatformFolderHint" = "Optional. Use / for submenus, for example Work/Clients. Leave empty to show it at the top level.";
+"topLevel" = "Top Level";
+"chooseExistingMenu" = "Choose an existing menu";

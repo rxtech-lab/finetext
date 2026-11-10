@@ -6,6 +6,7 @@ import SwiftUI
 @main struct FineTextApp: App {
   @State private var providers: ProviderStore
   @State private var preferences: Preferences
+  @State private var presets: PresetStore
   @State private var workspace: Workspace
   @State private var gemma = TranslationModelManager()
   @State private var updater = AppUpdater()
@@ -18,10 +19,13 @@ import SwiftUI
     let container = Persistence.makeContainer()
     let providers = ProviderStore()
     let preferences = Preferences()
+    let presets = PresetStore()
+    presets.startAutoRefresh()
     self.container = container
     _providers = State(initialValue: providers)
     _preferences = State(initialValue: preferences)
-    _workspace = State(initialValue: Workspace(container: container, providers: providers, preferences: preferences))
+    _presets = State(initialValue: presets)
+    _workspace = State(initialValue: Workspace(container: container, providers: providers, preferences: preferences, presets: presets))
   }
 
   var body: some Scene {
@@ -30,6 +34,7 @@ import SwiftUI
         .environment(workspace)
         .environment(providers)
         .environment(preferences)
+        .environment(presets)
         .environment(updater)
         .modelContainer(container)
     } label: {
@@ -42,6 +47,7 @@ import SwiftUI
         .environment(providers)
         .environment(providers.local)
         .environment(preferences)
+        .environment(presets)
         .environment(gemma)
         .environment(detector)
         .environment(updater)

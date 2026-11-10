@@ -91,6 +91,7 @@ targets:
       properties:
         LSUIElement: true
         SUFeedURL: https://update.finetext.rxlab.app/appcast.xml
+        PresetsURL: $(PRESETS_URL)
         SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
         SUEnableInstallerLauncherService: true
         SUEnableAutomaticChecks: true

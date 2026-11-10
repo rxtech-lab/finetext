@@ -188,68 +188,15 @@ struct RewriteSection: View {
   @Environment(Workspace.self) private var workspace
   @Environment(Preferences.self) private var preferences
   @Environment(ProviderStore.self) private var providers
+  @Environment(PresetStore.self) private var presets
+  @Environment(\.openSettings) private var openSettings
 
   @State private var showCustomPlatforms = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Menu {
-        if let platform = preferences.lastPlatform, let model = preferences.lastModel(.rewrite), providers.isAvailable(model) {
-          Button(LocalizableKey.again.format(platform.title, providers.displayName(model))) {
-            workspace.addRewrite(platform: platform, model: model)
-          }
-          Divider()
-        }
-        if let platform = preferences.lastCustomPlatform, let model = preferences.lastModel(.rewrite), providers.isAvailable(model) {
-          Button(LocalizableKey.again.format(platform.name, providers.displayName(model))) {
-            workspace.addRewrite(customPlatform: platform, model: model)
-          }
-          Divider()
-        }
-        ForEach(Platform.menuPlatforms) { platform in
-          Menu {
-            if platform.variants.isEmpty {
-              ModelMenuItems(kind: .text, purpose: .rewrite) { workspace.addRewrite(platform: platform, model: $0) }
-            } else {
-              ForEach(platform.variants) { variant in
-                Menu {
-                  ModelMenuItems(kind: .text, purpose: .rewrite) { workspace.addRewrite(platform: variant, model: $0) }
-                } label: {
-                  if variant == preferences.lastPlatform {
-                    Label(variant.variantTitle, systemImage: "checkmark")
-                  } else {
-                    Text(variant.variantTitle)
-                  }
-                }
-              }
-            }
-          } label: {
-            if platform == preferences.lastPlatform || platform.variants.contains(where: { $0 == preferences.lastPlatform }) {
-              Label(platform.menuTitle, systemImage: "checkmark")
-            } else {
-              Text(platform.menuTitle)
-            }
-          }
-        }
-        if !preferences.customPlatforms.isEmpty {
-          Divider()
-          ForEach(preferences.customPlatforms) { platform in
-            Menu(platform.name) {
-              ModelMenuItems(kind: .text, purpose: .rewrite) {
-                workspace.addRewrite(customPlatform: platform, model: $0)
-              }
-            }
-          }
-        }
-        Divider()
-        Button(LocalizableKey.customPlatforms.string, systemImage: "slider.horizontal.3") {
-          Haptics.tap()
-          showCustomPlatforms = true
-        }
-      } label: {
-        Label(LocalizableKey.addPlatform.string, systemImage: "plus.circle.fill")
-      }
-      .fixedSize()
+      LazyPullDownMenu(title: LocalizableKey.addPlatform.string, symbol: "plus.circle.fill") { menuEntries() }
+        .fixedSize()
 
       if workspace.session.rewrites.isEmpty {
         EmptyHint(symbol: "text.badge.plus", text: LocalizableKey.addAPlatformPickAModelThenRewrite.string)
@@ -260,16 +207,80 @@ struct RewriteSection: View {
           title: "\(item.platformTitle) · \(item.tone.title)",
           subtitle: providers.displayName(item.model),
           status: workspace.status(item.id),
-          preview: item.output,
+          preview: item.plainOutput,
           cost: workspace.cost(for: item.id),
           onRun: { workspace.run(item) },
           onStop: { workspace.stop(item.id) },
-          onCopy: { workspace.copy(item.output) },
+          onCopy: { workspace.copy(item.plainOutput) },
           onOpen: { workspace.route = .rewrite(item.id) }
         )
       }
     }
     .sheet(isPresented: $showCustomPlatforms) { CustomPlatformsSheet().onAppear { AppAnalytics.screen("custom_platforms") } }
+  }
+
+  private func menuEntries() -> [MenuEntry] {
+    let models = ModelMenuEntries(providers: providers, preferences: preferences, openSettings: openSettings)
+    let lastModel = preferences.lastModel(.rewrite).flatMap { providers.isAvailable($0) ? $0 : nil }
+    var entries: [MenuEntry] = []
+    if let lastModel, let id = preferences.lastPresetID, let entry = presets.entry(id: id) {
+      entries.append(.action(LocalizableKey.again.format(entry.title, providers.displayName(lastModel))) {
+        workspace.addRewrite(preset: entry, model: lastModel)
+      })
+      entries.append(.separator)
+    }
+    if let lastModel, let platform = preferences.lastCustomPlatform {
+      entries.append(.action(LocalizableKey.again.format(platform.name, providers.displayName(lastModel))) {
+        workspace.addRewrite(customPlatform: platform, model: lastModel)
+      })
+      entries.append(.separator)
+    }
+    entries += presetEntries(presets.catalog.items, path: [], models: models)
+    if !preferences.customPlatforms.isEmpty {
+      entries.append(.separator)
+      entries += customEntries(CustomPlatformNode.tree(preferences.customPlatforms), models: models)
+    }
+    entries.append(.separator)
+    entries.append(.action(LocalizableKey.customPlatforms.string, symbol: "slider.horizontal.3") {
+      Haptics.tap()
+      showCustomPlatforms = true
+    })
+    return entries
+  }
+
+  /// Custom presets nest by their folder path; each ends in the model picker.
+  private func customEntries(_ nodes: [CustomPlatformNode], models: ModelMenuEntries) -> [MenuEntry] {
+    let last = preferences.lastCustomPlatform?.id
+    return nodes.map { node in
+      switch node {
+      case .folder(let name, _, let children):
+        return .submenu(name, symbol: "folder", checked: node.contains(last)) { customEntries(children, models: models) }
+      case .platform(let platform):
+        return .submenu(platform.name, checked: platform.id == last) {
+          models.entries(kind: .text, purpose: .rewrite) { workspace.addRewrite(customPlatform: platform, model: $0) }
+        }
+      }
+    }
+  }
+
+  /// Cloud menus nest to any depth; each preset ends in the model picker.
+  private func presetEntries(_ nodes: [PresetNode], path: [LocalizedText], models: ModelMenuEntries) -> [MenuEntry] {
+    let last = preferences.lastPresetID
+    return nodes.compactMap { node in
+      switch node {
+      case .menu(let menu):
+        return .submenu(menu.title.localized, checked: last.map(menu.contains) ?? false) {
+          presetEntries(menu.children, path: path + [menu.title], models: models)
+        }
+      case .preset(let preset):
+        let entry = PresetEntry(preset: preset, path: path + [preset.title])
+        return .submenu(preset.title.localized, checked: preset.id == last) {
+          models.entries(kind: .text, purpose: .rewrite) { workspace.addRewrite(preset: entry, model: $0) }
+        }
+      case .unsupported:
+        return nil
+      }
+    }
   }
 }
 
@@ -277,35 +288,14 @@ struct TranslateSection: View {
   @Environment(Workspace.self) private var workspace
   @Environment(Preferences.self) private var preferences
   @Environment(ProviderStore.self) private var providers
+  @Environment(\.openSettings) private var openSettings
   @State private var source: UUID?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Menu {
-          if let language = preferences.lastLanguage, let model = preferences.lastModel(.translate), providers.isAvailable(model) {
-            Button(LocalizableKey.again.format(language.localizedName, providers.displayName(model))) {
-              workspace.addTranslation(language: language, model: model, source: validSource)
-            }
-            Divider()
-          }
-          ForEach(Language.all) { language in
-            Menu {
-              ModelMenuItems(kind: .text, purpose: .translate) {
-                workspace.addTranslation(language: language, model: $0, source: validSource)
-              }
-            } label: {
-              if language == preferences.lastLanguage {
-                Label(language.localizedName, systemImage: "checkmark")
-              } else {
-                Text(language.localizedName)
-              }
-            }
-          }
-        } label: {
-          Label(LocalizableKey.addLanguage.string, systemImage: "plus.circle.fill")
-        }
-        .fixedSize()
+        LazyPullDownMenu(title: LocalizableKey.addLanguage.string, symbol: "plus.circle.fill") { menuEntries() }
+          .fixedSize()
         Spacer()
         Picker(LocalizableKey.from.string, selection: $source) {
           Text(LocalizableKey.original.string).tag(UUID?.none)
@@ -334,6 +324,25 @@ struct TranslateSection: View {
         )
       }
     }
+  }
+
+  private func menuEntries() -> [MenuEntry] {
+    let models = ModelMenuEntries(providers: providers, preferences: preferences, openSettings: openSettings)
+    var entries: [MenuEntry] = []
+    if let language = preferences.lastLanguage, let model = preferences.lastModel(.translate), providers.isAvailable(model) {
+      entries.append(.action(LocalizableKey.again.format(language.localizedName, providers.displayName(model))) {
+        workspace.addTranslation(language: language, model: model, source: validSource)
+      })
+      entries.append(.separator)
+    }
+    for language in Language.all {
+      entries.append(.submenu(language.localizedName, checked: language == preferences.lastLanguage) {
+        models.entries(kind: .text, purpose: .translate) {
+          workspace.addTranslation(language: language, model: $0, source: validSource)
+        }
+      })
+    }
+    return entries
   }
 
   private var validSource: UUID? {
@@ -551,88 +560,80 @@ struct ModelMenuItems: View {
   let onPick: (ModelRef) -> Void
 
   var body: some View {
-    if !providers.hasSources(for: kind) {
-      Button(LocalizableKey.addAProviderInSettings.string) {
-        NSApp.activate()
-        openSettings()
-      }
-      if kind == .text {
-        Button(LocalizableKey.downloadModelFromHub.string, action: openLocalModels)
-      }
-    } else {
-      let last = preferences.lastModel(purpose)
-      let recent = preferences.recentModels(purpose).filter { ref in
-        providers.models(for: ref.providerID, kind: kind).contains { $0.id == ref.modelID }
-      }
-      if !recent.isEmpty {
-        Section(LocalizableKey.recent.string) {
-          ForEach(recent, id: \.self) { ref in
-            pickButton(providers.displayName(ref), ref: ref, selected: ref == last)
-          }
+    MenuEntriesView(entries: ModelMenuEntries(providers: providers, preferences: preferences, openSettings: openSettings)
+      .entries(kind: kind, purpose: purpose, onPick: onPick))
+  }
+}
+
+/// The model picker as menu data, built when its menu opens.
+@MainActor struct ModelMenuEntries {
+  let providers: ProviderStore
+  let preferences: Preferences
+  let openSettings: OpenSettingsAction
+
+  func entries(kind: ModelKind, purpose: Preferences.Purpose, onPick: @escaping (ModelRef) -> Void) -> [MenuEntry] {
+    guard providers.hasSources(for: kind) else {
+      var entries = [MenuEntry.action(LocalizableKey.addAProviderInSettings.string) { open(nil) }]
+      if kind == .text { entries.append(.action(LocalizableKey.downloadModelFromHub.string) { open(.local) }) }
+      return entries
+    }
+    let last = preferences.lastModel(purpose)
+    func pick(_ title: String, _ ref: ModelRef) -> MenuEntry {
+      .action(title, checked: ref == last) { onPick(ref) }
+    }
+    var entries: [MenuEntry] = []
+    let recent = preferences.recentModels(purpose).filter { ref in
+      providers.models(for: ref.providerID, kind: kind).contains { $0.id == ref.modelID }
+    }
+    if !recent.isEmpty {
+      entries.append(.header(LocalizableKey.recent.string))
+      entries += recent.map { pick(providers.displayName($0), $0) }
+      entries.append(.separator)
+    }
+    let cliProviders = (providers.codex != nil ? [ProviderStore.codexProvider] : [])
+      + (kind == .text && providers.claudeCode != nil ? [ProviderStore.claudeCodeProvider] : [])
+    for provider in cliProviders {
+      entries.append(.submenu(provider.name) {
+        var items = providers.models(for: provider.id, kind: kind).map { model in
+          pick(providers.modelName(ModelRef(providerID: provider.id, modelID: model.id)), ModelRef(providerID: provider.id, modelID: model.id))
         }
-      }
-      if providers.codex != nil {
-        cliMenu(ProviderStore.codexProvider, last: last)
-      }
-      if kind == .text, providers.claudeCode != nil {
-        cliMenu(ProviderStore.claudeCodeProvider, last: last)
-      }
-      if kind == .text {
+        if kind == .text {
+          items.append(.separator)
+          items.append(.action(LocalizableKey.refreshModels.string, enabled: !providers.loading.contains(provider.id)) {
+            Haptics.tap()
+            Task { await providers.refreshCLIModels(provider.id) }
+          })
+        }
+        return items
+      })
+    }
+    if kind == .text {
+      entries.append(.submenu(Provider.localName) {
         let local = providers.models(for: Provider.localID, kind: .text)
-        Menu(Provider.localName) {
-          ForEach(local) { model in
-            let ref = ModelRef(providerID: Provider.localID, modelID: model.id)
-            pickButton(model.id, ref: ref, selected: ref == last)
-          }
-          if !local.isEmpty { Divider() }
-          Button(LocalizableKey.downloadFromHub.string, action: openLocalModels)
-        }
-      }
-      ForEach(providers.providers) { provider in
+        var items = local.map { pick($0.id, ModelRef(providerID: Provider.localID, modelID: $0.id)) }
+        if !local.isEmpty { items.append(.separator) }
+        items.append(.action(LocalizableKey.downloadFromHub.string) { open(.local) })
+        return items
+      })
+    }
+    for provider in providers.providers {
+      entries.append(.submenu(provider.name) {
         let models = providers.models(for: provider.id, kind: kind)
-        Menu(provider.name) {
-          if models.isEmpty {
-            Text(providers.loading.contains(provider.id) ? LocalizableKey.loadingModels.string : LocalizableKey.noModels.format(kind == .text ? LocalizableKey.textModels.string : LocalizableKey.imageModels.string))
-            Button(LocalizableKey.refreshModels.string) { Task { await providers.refresh(provider.id) } }
-          }
-          ForEach(models) { model in
-            let ref = ModelRef(providerID: provider.id, modelID: model.id)
-            pickButton(model.id, ref: ref, selected: ref == last)
-          }
+        guard !models.isEmpty else {
+          let empty = providers.loading.contains(provider.id) ? LocalizableKey.loadingModels.string
+            : LocalizableKey.noModels.format(kind == .text ? LocalizableKey.textModels.string : LocalizableKey.imageModels.string)
+          return [.note(empty), .action(LocalizableKey.refreshModels.string) { Task { await providers.refresh(provider.id) } }]
         }
-      }
+        return models.map { pick($0.id, ModelRef(providerID: provider.id, modelID: $0.id)) }
+      })
     }
+    return entries
   }
 
-  private func cliMenu(_ provider: Provider, last: ModelRef?) -> some View {
-    Menu(provider.name) {
-      ForEach(providers.models(for: provider.id, kind: kind)) { model in
-        let ref = ModelRef(providerID: provider.id, modelID: model.id)
-        pickButton(providers.modelName(ref), ref: ref, selected: ref == last)
-      }
-      if kind == .text {
-        Divider()
-        Button(LocalizableKey.refreshModels.string) {
-          Haptics.tap()
-          Task { await providers.refreshCLIModels(provider.id) }
-        }
-        .disabled(providers.loading.contains(provider.id))
-      }
-    }
-  }
-
-  /// Opens Settings on the Local Models tab.
-  private func openLocalModels() {
-    UserDefaults.standard.set(SettingsTab.local.rawValue, forKey: DefaultsKey.settingsTab)
+  /// Opens Settings, optionally on a specific tab.
+  private func open(_ tab: SettingsTab?) {
+    if let tab { UserDefaults.standard.set(tab.rawValue, forKey: DefaultsKey.settingsTab) }
     NSApp.activate()
     openSettings()
-  }
-
-  @ViewBuilder private func pickButton(_ title: String, ref: ModelRef, selected: Bool) -> some View {
-    Button {
-      onPick(ref)
-    } label: {
-      if selected { Label(title, systemImage: "checkmark") } else { Text(title) }
-    }
   }
 }

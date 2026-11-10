@@ -9,11 +9,21 @@ struct RefinementResultView: View {
   let status: JobStatus
   var limit: Int?
   var assessment: RewriteItem?
+  var preview: String?
+  /// Structured presets (e.g. email subject + body) show one editable box per field.
+  var fields: [PresetField]?
   @State private var showingBefore = false
   @State private var showEditor = false
   @State private var replayToken = 0
 
-  private var showsOriginal: Bool { showingBefore || output.isEmpty }
+  private var displayedOutput: String { status.isRunning ? (preview ?? output) : output }
+  /// Readable text for the animation and counts; field tags never show.
+  private var displayedText: String { StructuredOutput.plainText(displayedOutput, fields: fields) }
+  private var showsOriginal: Bool { showingBefore || displayedOutput.isEmpty }
+  private var showsFields: Bool {
+    guard let fields, !showsOriginal, !status.isRunning else { return false }
+    return StructuredOutput.parse(output, fields: fields) != nil
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -41,44 +51,31 @@ struct RefinementResultView: View {
         }
         .help(showingBefore ? LocalizableKey.showAfterRefinement.string : LocalizableKey.showBeforeRefinement.string)
         .disabled(output.isEmpty || status.isRunning)
-        IconButton("square.and.pencil", help: LocalizableKey.edit.string) { showEditor = true }
-          .disabled(output.isEmpty || status.isRunning)
-      }
-      AnimatedRefinementText(
-        text: showsOriginal ? original : output, original: original,
-        refined: output, animateChanges: status.isRunning, replayToken: replayToken
-      )
-        .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
-        .overlay(alignment: .bottom) {
-          if status.isRunning {
-            VStack(spacing: 8) {
-              if case .running(let message) = status { ProgressView(message) }
-              if let assessment, let score = assessment.finalAIScore {
-                Text(LocalizableKey.aiScoreValue.format(score.formatted(.number.precision(.fractionLength(1)))))
-                  .font(.caption).monospacedDigit()
-                if let target = assessment.targetAIScore {
-                  Text("\(LocalizableKey.targetAIScore.string): \(Int(target))/100").font(.caption).foregroundStyle(.secondary)
-                }
-              }
-            }.padding(10)
-              .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-              .padding(8)
-              .allowsHitTesting(false)
-          }
+        if !showsFields {
+          IconButton("square.and.pencil", help: LocalizableKey.edit.string) { showEditor = true }
+            .disabled(output.isEmpty || status.isRunning)
         }
+      }
+      if showsFields, let fields {
+        StructuredOutputView(output: $output, fields: fields)
+          .transition(.opacity)
+      } else {
+        refinementText
+      }
       HStack {
-        if !showsOriginal, let assessment, assessment.aiScoredText == output, assessment.finalAIScore != nil {
+        if !showsOriginal, let assessment, assessment.aiScoredText == displayedOutput, assessment.finalAIScore != nil {
           AIScoreButton(item: assessment)
         }
         Spacer()
-        Group {
-          if let limit, !showsOriginal {
-            Text("\(output.count)/\(limit)")
-              .foregroundStyle(output.count > limit ? .red : .secondary)
-          } else {
-            Text(LocalizableKey.characterCount.format((showsOriginal ? original : output).count))
-              .foregroundStyle(.secondary)
+        if !showsFields {
+          Group {
+            if let limit, !showsOriginal {
+              Text("\(displayedText.count)/\(limit)")
+                .foregroundStyle(displayedText.count > limit ? .red : .secondary)
+            } else {
+              Text(LocalizableKey.characterCount.format((showsOriginal ? original : displayedText).count))
+                .foregroundStyle(.secondary)
+            }
           }
         }
       }
@@ -90,6 +87,32 @@ struct RefinementResultView: View {
     }
     .sheet(isPresented: $showEditor) {
       RewriteOutputSheet(text: $output, limit: limit)
+    }
+  }
+
+  private var refinementText: some View {
+    AnimatedRefinementText(
+      text: showsOriginal ? original : displayedText, original: original,
+      refined: displayedText, animateChanges: status.isRunning, replayToken: replayToken
+    )
+    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
+    .overlay(alignment: .bottom) {
+      if status.isRunning {
+        VStack(spacing: 8) {
+          if case .running(let message) = status { ProgressView(message) }
+          if let assessment, let score = assessment.finalAIScore {
+            Text((preview == nil ? LocalizableKey.aiScoreValue : .bestAIScoreValue).format(score.formatted(.number.precision(.fractionLength(1)))))
+              .font(.caption).monospacedDigit()
+            if let target = assessment.targetAIScore {
+              Text("\(LocalizableKey.targetAIScore.string): \(Int(target))/100").font(.caption).foregroundStyle(.secondary)
+            }
+          }
+        }.padding(10)
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+          .padding(8)
+          .allowsHitTesting(false)
+      }
     }
   }
 }
