@@ -1,9 +1,10 @@
 import Foundation
 import RxAgentSDK
 
-struct ChatMessage: Sendable { let role: String; let content: String }
-enum APIError: Error { case empty; case http(Int, String) }
-extension String { var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) } }
+// Only unrelated model-download defaults are stubbed; adapter and image types use production sources.
+enum HumanizationEngine: String { case translateGemma }
+enum AIDetectorEngine: String { case disabled }
+struct TranslationModel { var id = "test"; static let `default` = TranslationModel() }
 
 @main struct AgentAdapterTests {
   static func check(_ condition: Bool, _ message: String) throws {
@@ -48,6 +49,7 @@ extension String { var trimmed: String { trimmingCharacters(in: .whitespacesAndN
     assert '--no-session-persistence' in sys.argv and '--strict-mcp-config' in sys.argv
     assert sys.argv[sys.argv.index('--tools') + 1] == ''
     prompt = json.loads(sys.stdin.readline())['message']['content'][0]['text']
+    assert prompt.startswith('Rewrite this.\\n\\nLong draft')
     assert len(prompt) > 100000 and 'Long draft' not in ' '.join(sys.argv)
     print(json.dumps({'type':'assistant','message':{'content':[{'type':'text','text':'Hello 中文'}]}}), flush=True)
     print(json.dumps({'type':'result','is_error':False}), flush=True)
@@ -65,11 +67,12 @@ extension String { var trimmed: String { trimmingCharacters(in: .whitespacesAndN
         result = {}
         if method == 'thread/start':
             assert params['sandbox'] == 'read-only' and params['approvalPolicy'] == 'untrusted'
-            assert 'Rewrite this.' in params['developerInstructions']
+            assert not params.get('developerInstructions')
             result = {'thread':{'id':'test-thread'}}
         if method == 'turn/start':
             assert params['model'] == 'chosen-codex'
             assert len(params['input'][0]['text']) > 100000
+            assert params['input'][0]['text'].startswith('Rewrite this.\\n\\nLong draft')
         print(json.dumps({'id':msg['id'],'result':result}), flush=True)
         if method == 'turn/start':
             print(json.dumps({'method':'item/agentMessage/delta','params':{'delta':'Codex reply'}}), flush=True)
