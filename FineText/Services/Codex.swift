@@ -51,7 +51,7 @@ enum CodexLocator {
     return nil
   }
 
-  private static func run(_ path: String, _ arguments: [String], environment: [String: String]? = nil) async -> String? {
+  static func run(_ path: String, _ arguments: [String], environment: [String: String]? = nil) async -> String? {
     await withCheckedContinuation { continuation in
       let process = Process()
       process.executableURL = URL(fileURLWithPath: path)
@@ -236,12 +236,22 @@ final class CodexSession: @unchecked Sendable {
 extension CodexSession {
   /// Generates an image with Codex's built-in image tool. Pass `inputImage` to edit an existing image; it's
   /// attached to the turn as a local image.
-  static func generateImage(install: CodexInstall, prompt: String, inputImage: Data? = nil,
+  static func generateImage(install: CodexInstall, prompt: String, inputImage: Data? = nil, animatedGIF: Bool = false, frameCount: Int = 9, frameDurationMS: Int = 200, size: String = "512x512",
                             onStatus: @MainActor @Sendable @escaping (String) -> Void) async throws -> Data {
+    if animatedGIF {
+      let plan = GIFAnimationPlan(frameCount: frameCount, durationMS: frameDurationMS, size: size)
+      return try await plan.render(direction: prompt, reference: inputImage) { direction, _, reference, index, count in
+        let progress = LocalizableKey.gifGridProgress.format(index, count)
+        await onStatus(progress)
+        return try await generateImage(install: install, prompt: direction, inputImage: reference) { status in
+          onStatus(progress + " · " + status)
+        }
+      }
+    }
     var attachment: URL?
     if let inputImage {
       let url = workingDirectory.appending(path: "input-\(UUID().uuidString).png")
-      try inputImage.write(to: url)
+      try ImageOutput.stillReference(inputImage).write(to: url)
       attachment = url
     }
     defer { if let attachment { try? FileManager.default.removeItem(at: attachment) } }
@@ -282,6 +292,8 @@ extension CodexSession {
   }
 
   private static func imageData(from item: [String: Any]) -> Data? {
+    // Animated results may include a still preview in result; prefer the saved original.
+    if let path = item["savedPath"] as? String, let data = FileManager.default.contents(atPath: path), ImageOutput.isGIF(data) { return data }
     if let base64 = item["result"] as? String, !base64.isEmpty {
       let payload = base64.hasPrefix("data:") ? String(base64[(base64.firstIndex(of: ",").map { base64.index(after: $0) } ?? base64.startIndex)...]) : base64
       if let data = Data(base64Encoded: payload, options: .ignoreUnknownCharacters) { return data }

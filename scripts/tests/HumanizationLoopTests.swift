@@ -122,6 +122,20 @@ enum AIDetectorError: Error { case notReady, emptyText }
       score: nil, refine: { _, round in String(round) }, update: { _ in }
     )
     expect(unscored.text == "2" && unscored.score == nil, "Manual mode works without a detector")
+
+    let newlyEligible = try await HumanizationLoop.run(
+      text: "short", mode: .manual, rounds: 2, target: 0,
+      score: { $0 == "short" ? nil : 40 },
+      refine: { _, round in round == 1 ? "eligible draft" : "short" }, update: { _ in }
+    )
+    expect(newlyEligible.text == "eligible draft" && newlyEligible.score == 40,
+           "Score later eligible drafts and retain them when a later draft is unsupported")
+    let stillUnsupported = try await HumanizationLoop.run(
+      text: "short", mode: .manual, rounds: 2, target: 0,
+      score: { _ in nil }, refine: { _, round in "short \(round)" }, update: { _ in }
+    )
+    expect(stillUnsupported.text == "short 2" && stillUnsupported.score == nil,
+           "Manual refinement continues while drafts remain unsupported")
     do {
       _ = try await HumanizationLoop.run(text: "0", mode: .automatic, rounds: 3, target: 20,
         score: nil, refine: { text, _ in text }, update: { _ in })

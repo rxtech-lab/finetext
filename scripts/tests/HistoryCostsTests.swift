@@ -45,6 +45,42 @@ struct TranslationModel { var id = "test"; static let `default` = TranslationMod
     }
     let absent = try HistoryStore.page(in: context, query: "absent", offset: 0)
     precondition(absent.isEmpty)
+
+    // MCP requests get independent, immediately searchable history, including while
+    // output is pending. Saving later rounds must update the same persisted item.
+    let externalItem = RewriteItem(presetID: "email", tone: .natural, model: model)
+    externalItem.refinementSource = "MCP email draft"
+    externalItem.customPlatformName = "Email"
+    let externalSession = try HistoryStore.createRewriteSession(in: context, text: "MCP email draft", item: externalItem)
+    let humanizedItem = RewriteItem(presetID: "message", tone: .natural, model: model)
+    let humanizedSession = try HistoryStore.createRewriteSession(in: context, text: "MCP humanize draft", item: humanizedItem)
+    precondition(externalSession.id != humanizedSession.id && externalSession.id != first[0].id)
+    precondition(externalItem.session?.id == externalSession.id)
+    let pendingExternal = try HistoryStore.page(in: context, query: "MCP", offset: 0)
+    precondition(pendingExternal.count == 2)
+    externalItem.output = "Saved external output"
+    externalItem.initialAIScore = 80
+    externalItem.finalAIScore = 15
+    externalItem.humanizationRounds = 2
+    humanizedItem.output = "Saved humanized output"
+    let externalCharge = GenerationCharge(sessionID: externalSession.id, itemID: externalItem.id, modelID: model.modelID, kind: "mcp")
+    externalCharge.costUSD = 0.05
+    context.insert(externalCharge)
+    try context.save()
+    let externalReload = ModelContext(container)
+    let savedExternal = try HistoryStore.page(in: externalReload, query: "Saved external output", offset: 0)
+    precondition(savedExternal.count == 1 && savedExternal[0].id == externalSession.id)
+    let savedItem = savedExternal[0].rewrites[0]
+    precondition(savedItem.id == externalItem.id && savedItem.refinementSource == "MCP email draft")
+    precondition(savedItem.finalAIScore == 15 && savedItem.humanizationRounds == 2)
+    precondition(savedItem.platformTitle == "Email")
+    let savedCharges = try externalReload.fetch(FetchDescriptor<GenerationCharge>())
+    precondition(CostSummary(charges: savedCharges.filter { $0.sessionID == savedExternal[0].id }).total == 0.05)
+    context.delete(externalSession)
+    context.delete(humanizedSession)
+    context.delete(externalCharge)
+    try context.save()
+
     let session = first[0]
     session.summaryTitle = "AI summary"
     session.summarySource = session.titleSource
@@ -101,6 +137,6 @@ struct TranslationModel { var id = "test"; static let `default` = TranslationMod
     let reloaded = ModelContext(container)
     let surviving = try reloaded.fetch(FetchDescriptor<GenerationCharge>())
     precondition(surviving.count == 3 && abs(CostSummary(charges: surviving).total - 0.3) < 0.00000001)
-    print("PASS: disk-backed 20/20/5 paging, full-content search, title invalidation, pricing/usage parsing, cached-token estimate, unknown costs, cumulative spend, deletion-safe ledger")
+    print("PASS: disk-backed paging, MCP session isolation/persistence/search/scores/costs, title invalidation, pricing/usage parsing, cumulative spend, deletion-safe ledger")
   }
 }

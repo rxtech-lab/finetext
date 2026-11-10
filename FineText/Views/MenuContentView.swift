@@ -205,7 +205,7 @@ struct RewriteSection: View {
         JobCard(
           symbol: item.platformSymbol,
           title: "\(item.platformTitle) · \(item.tone.title)",
-          subtitle: providers.displayName(item.model),
+          subtitle: "\(providers.displayName(item.model)) · \(item.targetLanguageTitle)",
           status: workspace.status(item.id),
           preview: item.plainOutput,
           cost: workspace.cost(for: item.id),

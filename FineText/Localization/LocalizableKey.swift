@@ -2,6 +2,8 @@ import Foundation
 
 /// Centralized UI strings. Raw values are stable localization keys, never persisted model values.
 enum LocalizableKey: String, CaseIterable, Sendable {
+  case targetLanguage
+  case sameAsOriginal
   case nllbInvalidOutput
   case nllbOutputLimit
   case removingTranslationModel
@@ -392,6 +394,64 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case detectorDownloadingModel
   case detectorCancelling
   case detectorModelReady
+
+  case mcpServer
+  case mcpEnableServer
+  case mcpStatus
+  case mcpURL
+  case mcpPort
+  case mcpApplyPort
+  case mcpDescription
+  case mcpConnect
+  case mcpTools
+  case mcpRequests
+  case mcpRecentRequests
+  case mcpRunningRequests
+  case mcpViewRequestLog
+  case mcpRunning
+  case mcpStarting
+  case mcpStopped
+  case mcpFailed
+  case mcpSucceeded
+  case mcpCancelled
+  case mcpInvalidPort
+  case mcpPortUpdated
+  case mcpRequestLog
+  case mcpNoRequests
+  case mcpNoRequestsHint
+  case mcpClearLog
+  case mcpClearLogConfirm
+  case mcpClearLogMessage
+  case mcpLogCleared
+  case mcpMethod
+  case mcpTool
+  case mcpClient
+  case mcpReceived
+  case mcpProgress
+  case mcpRequest
+  case mcpResponse
+
+  case animatedGIF
+  case imageOutput
+  case outputStillImage
+  case gifFrames
+  case gifFrameDuration
+  case gifLoopDuration
+  case gifSettingsHint
+  case gifModelRequired
+  case gifProviderRequired
+  case gifStillReturned
+  case gifSettingsSaved
+
+
+  case gifGridInvalid
+  case gifAssembling
+  case gifGeneratingGrid
+
+  case gifGridProgress
+  case gifGridCount
+
+  case gifContinuationUnsupported
 
   var string: String {
     Bundle.main.localizedString(forKey: rawValue, value: nil, table: "Localizable")

@@ -100,6 +100,18 @@ struct RewriteDetailView: View {
             ForEach(Tone.allCases) { Text($0.title).tag($0) }
           }
           .onChange(of: item.tone) { _, tone in preferences.setTone(tone, for: item) }
+          Picker(LocalizableKey.targetLanguage.string, selection: $item.targetLanguageCode) {
+            Text(LocalizableKey.sameAsOriginal.string).tag(String?.none)
+            ForEach(Language.all) { language in
+              Text(language.localizedName).tag(Optional(language.code))
+            }
+          }
+          .onChange(of: item.targetLanguageCode) { _, _ in
+            preferences.remember(rewriteLanguage: item.targetLanguage)
+            workspace.save()
+            Haptics.tap()
+          }
+          .disabled(status.isRunning)
           ModelPickerMenu(kind: .text, purpose: .rewrite, current: item.model) {
             item.model = $0
             preferences.remember($0, for: .rewrite)
@@ -178,6 +190,7 @@ struct ImageDetailView: View {
   @Environment(Preferences.self) private var preferences
   let id: UUID
   @State private var showRefine = false
+  @State private var showAnimationSettings = false
 
   var body: some View {
     if let item = workspace.session.images.first(where: { $0.id == id }) {
@@ -192,6 +205,13 @@ struct ImageDetailView: View {
           ModelPickerMenu(kind: .image, purpose: .image, current: item.model) {
             item.model = $0
             preferences.remember($0, for: .image)
+            if !workspace.supportsGIF(item) { item.animatedGIF = false }
+          }
+          if workspace.supportsGIF(item) {
+            Button { showAnimationSettings = true } label: {
+              Label(item.animatedGIF ? LocalizableKey.animatedGIF.string : LocalizableKey.outputStillImage.string, systemImage: "film")
+            }
+            .disabled(status.isRunning)
           }
           Picker(LocalizableKey.size.string, selection: $item.size) {
             ForEach(ImageSize.allCases) { Text($0.title).tag($0) }
@@ -200,9 +220,10 @@ struct ImageDetailView: View {
           VStack(alignment: .leading, spacing: 2) {
             Toggle(LocalizableKey.transparentBackground.string, isOn: $item.transparentBackground)
               .toggleStyle(.switch)
+              .disabled(item.animatedGIF)
               .controlSize(.small)
               .onChange(of: item.transparentBackground) { Haptics.tap() }
-            if item.transparentBackground {
+            if item.transparentBackground && !item.animatedGIF {
               Text(workspace.backgroundMode(for: item) == .native
                    ? LocalizableKey.transparentNativeHint.string
                    : LocalizableKey.transparentGreenScreenHint.string)
@@ -217,17 +238,26 @@ struct ImageDetailView: View {
           ZStack {
             RoundedRectangle(cornerRadius: 10).fill(.background.secondary)
             if let data = item.imageData, let image = NSImage(data: data) {
-              Image(nsImage: image).resizable().scaledToFit()
-                .background { if item.transparentBackground, BackgroundRemover.hasAlphaChannel(data) { Checkerboard() } }
-                .clipShape(RoundedRectangle(cornerRadius: 8)).padding(6)
-                .draggable(Image(nsImage: image))
-                .overlay {
-                  if status.isRunning {
-                    ProgressView().controlSize(.regular)
-                      .padding(14)
-                      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+              GeometryReader { geometry in
+                Group {
+                  if ImageOutput.isGIF(data) {
+                    AnimatedImagePreview(data: data)
+                  } else {
+                    Image(nsImage: image).resizable().scaledToFit().draggable(Image(nsImage: image))
                   }
                 }
+                .frame(width: max(0, geometry.size.width - 12), height: max(0, geometry.size.height - 12))
+                .background { if item.transparentBackground, BackgroundRemover.hasAlphaChannel(data) { Checkerboard() } }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(6)
+              }
+              .overlay {
+                if status.isRunning {
+                  ProgressView().controlSize(.regular)
+                    .padding(14)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+              }
             } else if status.isRunning {
               ProgressView(LocalizableKey.generating.string)
             } else {
@@ -235,7 +265,8 @@ struct ImageDetailView: View {
                 .foregroundStyle(.secondary).font(.callout)
             }
           }
-          .frame(maxHeight: .infinity)
+          .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+          .clipped()
         }
         .padding(14)
         Divider()
@@ -270,6 +301,9 @@ struct ImageDetailView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+      }
+      .sheet(isPresented: $showAnimationSettings) {
+        ImageAnimationSheet(item: item)
       }
       .sheet(isPresented: $showRefine) {
         RefineImageSheet(item: item) { instruction in workspace.refine(item, instruction: instruction) }
@@ -451,7 +485,7 @@ struct HistoryView: View {
         .allowsHitTesting(false)
       }
     }
-    .task(id: searchText) {
+    .task(id: "\(workspace.historyRevision):\(searchText)") {
       if !searchText.isEmpty {
         do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
       }
@@ -529,5 +563,87 @@ struct HistoryView: View {
     .buttonStyle(.plain)
     .contextMenu { Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session } }
     .swipeActions { Button(LocalizableKey.delete.string, role: .destructive) { pendingDelete = session } }
+  }
+}
+
+/// NSImageView retains AppKit's native GIF timing and looping behavior.
+struct AnimatedImagePreview: NSViewRepresentable {
+  let data: Data
+  final class Coordinator { var data: Data? }
+  func makeCoordinator() -> Coordinator { Coordinator() }
+  /// Image pixel dimensions must never become the menu-bar window's minimum size.
+  final class FittingImageView: NSImageView {
+    override var intrinsicContentSize: NSSize {
+      NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+  }
+
+  func makeNSView(context: Context) -> FittingImageView {
+    let view = FittingImageView()
+    view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    view.setContentHuggingPriority(.defaultLow, for: .vertical)
+    view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+    view.imageScaling = .scaleProportionallyUpOrDown
+    view.animates = true
+    return view
+  }
+  func sizeThatFits(_ proposal: ProposedViewSize, nsView: FittingImageView, context: Context) -> CGSize? {
+    CGSize(width: proposal.width ?? 0, height: proposal.height ?? 0)
+  }
+
+  func updateNSView(_ view: FittingImageView, context: Context) {
+    if context.coordinator.data != data {
+      context.coordinator.data = data
+      view.image = NSImage(data: data)
+    }
+    view.animates = true
+  }
+}
+
+struct ImageAnimationSheet: View {
+  @Environment(Workspace.self) private var workspace
+  @Environment(\.dismiss) private var dismiss
+  let item: ImageItem
+  @State private var animated = false
+  @State private var frames = 9
+  @State private var duration = 200
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text(LocalizableKey.imageOutput.string).font(.headline)
+      Form {
+        Toggle(LocalizableKey.animatedGIF.string, isOn: $animated)
+        if animated {
+          Stepper(LocalizableKey.gifFrames.format(frames), value: $frames, in: 2...GIFAnimationPlan.maximumFrames)
+          Stepper(LocalizableKey.gifFrameDuration.format(duration), value: $duration, in: 20...2000, step: 10)
+          Text(LocalizableKey.gifLoopDuration.format(String(format: "%.2f", Double(frames * duration) / 1000)))
+            .foregroundStyle(.secondary)
+          Text(LocalizableKey.gifGridCount.format((frames + 15) / 16))
+            .foregroundStyle(.secondary)
+          Text(LocalizableKey.gifSettingsHint.string)
+            .font(.caption).foregroundStyle(.secondary)
+        }
+      }
+      Spacer(minLength: 0)
+      HStack {
+        Spacer()
+        Button(LocalizableKey.cancel.string, role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+        Button(LocalizableKey.save.string) {
+          item.animatedGIF = animated
+          item.gifFrameCount = frames
+          item.gifFrameDurationMS = duration
+          workspace.flash(LocalizableKey.gifSettingsSaved.string, symbol: "checkmark.circle")
+          dismiss()
+        }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+      }
+    }
+    .padding(20)
+    .frame(width: 420, height: 390, alignment: .topLeading)
+    .onAppear {
+      animated = item.animatedGIF
+      frames = min(GIFAnimationPlan.maximumFrames, max(2, item.gifFrameCount))
+      duration = min(2000, max(20, (item.gifFrameDurationMS / 10) * 10))
+    }
   }
 }

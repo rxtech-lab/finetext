@@ -34,7 +34,7 @@ enum HumanizationLoop {
 
   static func run(
     text: String, mode: HumanizationMode, rounds: Int, target: Double,
-    score: (@MainActor (String) async throws -> Double)?,
+    score: (@MainActor (String) async throws -> Double?)?,
     refine: @MainActor (String, Int) async throws -> String,
     preview: @MainActor (String) -> Void = { _ in },
     update: @MainActor (Result) -> Void
@@ -65,7 +65,9 @@ enum HumanizationLoop {
       completed += 1
       current = candidate
       currentScore = value
-      if value == nil || best.score == nil || value! < best.score! {
+      // Unsupported candidates cannot replace an already scored result. A later
+      // eligible draft can still acquire a score when the initial text was too short.
+      if best.score == nil || (value != nil && value! < best.score!) {
         best = Result(text: candidate, score: value, rounds: completed)
         roundsWithoutImprovement = 0
       } else {

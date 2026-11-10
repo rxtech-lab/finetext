@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 // Only the app's unrelated model-download defaults are stubbed in this standalone check.
 enum HumanizationEngine: String { case translateGemma }
@@ -49,8 +50,36 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     try bundledCatalog(bundled)
     structuredOutput()
     customPlatformTree()
+    try rewriteLanguage(scratch: scratch)
     try await store(bundled: bundled, scratch: scratch)
     print("Preset tests passed.")
+  }
+
+  @MainActor static func rewriteLanguage(scratch: URL) throws {
+    let url = scratch.appending(path: "rewrite-language.store")
+    let model = ModelRef(providerID: UUID(), modelID: "test")
+    let id: UUID
+    do {
+      let container = try ModelContainer(for: RewriteItem.self, configurations: ModelConfiguration(url: url))
+      let context = ModelContext(container)
+      let item = RewriteItem(presetID: "message", tone: .natural, model: model)
+      check(item.targetLanguage == nil, "Existing rewrites preserve their source language by default")
+      check(item.outputLanguageInstruction.contains("same language"), "Default prompt preserves source language")
+      item.targetLanguage = Language.named(code: "zh-Hant")
+      check(item.outputLanguageInstruction.contains("Chinese (Traditional) (zh-Hant)"), "Prompt specifies the target and script")
+      check(item.outputLanguageInstruction.contains("overrides language instructions"), "Target takes precedence over preset language")
+      id = item.id
+      context.insert(item)
+      try context.save()
+    }
+    let container = try ModelContainer(for: RewriteItem.self, configurations: ModelConfiguration(url: url))
+    let context = ModelContext(container)
+    let items = try context.fetch(FetchDescriptor<RewriteItem>())
+    let saved = items.first { $0.id == id }
+    check(saved?.targetLanguage?.code == "zh-Hant", "Target language survives reopening history")
+    saved?.targetLanguage = nil
+    try context.save()
+    check(saved?.targetLanguageCode == nil, "Same as original clears the explicit target")
   }
 
   static func templateCases(_ root: URL) throws {

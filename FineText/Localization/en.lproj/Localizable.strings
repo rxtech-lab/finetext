@@ -411,3 +411,64 @@
 "customPlatformFolderHint" = "Optional. Use / for submenus, for example Work/Clients. Leave empty to show it at the top level.";
 "topLevel" = "Top Level";
 "chooseExistingMenu" = "Choose an existing menu";
+
+/* MCP server */
+"mcpServer" = "MCP Server";
+"mcpEnableServer" = "Enable MCP server";
+"mcpStatus" = "Status";
+"mcpURL" = "URL";
+"mcpPort" = "Port";
+"mcpApplyPort" = "Apply";
+"mcpDescription" = "Other apps on this Mac, such as vc-email or Claude Code, can list your templates and rewrite text with FineText. Every rewrite runs through your humanizer and AI detector settings. The server only listens on 127.0.0.1.";
+"mcpConnect" = "Connect a client";
+"mcpTools" = "Tools";
+"mcpRequests" = "Requests";
+"mcpRecentRequests" = "Recent requests";
+"mcpRunningRequests" = "Running now";
+"mcpViewRequestLog" = "View Request Log…";
+"mcpRunning" = "Running";
+"mcpStarting" = "Starting…";
+"mcpStopped" = "Stopped";
+"mcpFailed" = "Failed: %@";
+"mcpSucceeded" = "Succeeded";
+"mcpCancelled" = "Cancelled";
+"mcpInvalidPort" = "Enter a port from 1024 to 65535";
+"mcpPortUpdated" = "MCP server now uses port %lld";
+"mcpRequestLog" = "MCP Requests";
+"mcpNoRequests" = "No Requests Yet";
+"mcpNoRequestsHint" = "Requests from MCP clients appear here while FineText is running.";
+"mcpClearLog" = "Clear Log";
+"mcpClearLogConfirm" = "Clear the request log?";
+"mcpClearLogMessage" = "Finished requests are removed. Running requests stay in the list.";
+"mcpLogCleared" = "Request log cleared";
+"mcpMethod" = "Method";
+"mcpTool" = "Tool";
+"mcpClient" = "Client";
+"mcpReceived" = "Received";
+"mcpProgress" = "Progress";
+"mcpRequest" = "Request";
+"mcpResponse" = "Response";
+"targetLanguage" = "Target language";
+"sameAsOriginal" = "Same as original";
+
+"animatedGIF" = "Animated GIF";
+"imageOutput" = "Image Output";
+"outputStillImage" = "Output: Still image";
+"gifFrames" = "Frames: %lld";
+"gifFrameDuration" = "Frame duration: %lld ms";
+"gifLoopDuration" = "Loop duration: %@ seconds";
+"gifSettingsHint" = "Describe motion and looping in Art Direction. Longer animations use multiple grids, with the previous final frame guiding the next grid. Each grid is a separate image request and may incur a charge. Motion consistency depends on the model.";
+"gifModelRequired" = "GIF output requires GPT Image 2.6 Flare or Sunburst.";
+"gifProviderRequired" = "GIF output requires Codex or GPT Image 2.6 Flare or Sunburst.";
+"gifStillReturned" = "The provider returned a still image instead of an animated GIF. Check that GIF generation is available for this model and account.";
+"gifSettingsSaved" = "Image output settings saved";
+
+
+"gifGridInvalid" = "The animation frame grid could not be decoded or assembled. Try regenerating with fewer frames.";
+"gifAssembling" = "Assembling animation frames…";
+"gifGeneratingGrid" = "Generating animation frame grid…";
+
+"gifGridProgress" = "Generating animation grid %lld of %lld…";
+"gifGridCount" = "Image grids: %lld (one image request per grid)";
+
+"gifContinuationUnsupported" = "This provider cannot edit images to continue the next animation grid. Use up to 16 frames or a provider with image editing support.";

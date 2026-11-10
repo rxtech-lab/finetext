@@ -2,6 +2,16 @@ import Foundation
 import SwiftData
 
 enum HistoryStore {
+  /// Keep MCP jobs separate from the draft currently being edited in the menu.
+  @MainActor static func createRewriteSession(in context: ModelContext, text: String, item: RewriteItem) throws -> RefinementSession {
+    let session = RefinementSession()
+    session.originalText = text
+    context.insert(session)
+    session.rewrites.append(item)
+    try context.save()
+    return session
+  }
+
   @MainActor static func page(in context: ModelContext, query: String, offset: Int) throws -> [RefinementSession] {
     let nonempty = #Predicate<RefinementSession> {
       !$0.originalText.isEmpty || !$0.rewrites.isEmpty || !$0.translations.isEmpty || !$0.images.isEmpty

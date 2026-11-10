@@ -240,6 +240,7 @@ enum Keychain {
     /// Preset id. Older builds stored the enum raw value, which is the same string.
     var lastPlatform: String?
     var lastLanguage: String?
+    var lastRewriteLanguage: String?
     var lastModels: [String: ModelRef] = [:]
     var recentModels: [String: [ModelRef]] = [:]
     var tones: [String: Tone] = [:]
@@ -298,6 +299,8 @@ enum Keychain {
     stored.tones[item.customPlatformID.map { "custom-" + $0.uuidString } ?? item.platformRaw] = tone
   }
   var lastLanguage: Language? { stored.lastLanguage.map(Language.named(code:)) }
+  var lastRewriteLanguage: Language? { stored.lastRewriteLanguage.map(Language.named(code:)) }
+  func remember(rewriteLanguage: Language?) { stored.lastRewriteLanguage = rewriteLanguage?.code }
   func lastModel(_ purpose: Purpose) -> ModelRef? { stored.lastModels[purpose.rawValue] }
   func recentModels(_ purpose: Purpose) -> [ModelRef] { stored.recentModels[purpose.rawValue] ?? [] }
   func tone(for preset: Preset) -> Tone { stored.tones[preset.id] ?? preset.defaultTone }

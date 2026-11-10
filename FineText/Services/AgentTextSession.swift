@@ -31,14 +31,9 @@ enum AgentTextSession {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("FineText-Agent-\(UUID())")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let conversation = messages.filter { $0.role != "system" }
-    let prompt = conversation.count == 1 ? conversation[0].content
-      : conversation.map { "\($0.role.capitalized):\n\($0.content)" }.joined(separator: "\n\n")
-    let instructions = (messages.filter { $0.role == "system" }.map(\.content) + [
-      "You are a writing assistant inside FineText. Return only the requested text. Do not use tools, read files, run commands, browse, or ask follow-up questions."
-    ]).joined(separator: "\n\n")
+    let prompt = messages.map(\.content).joined(separator: "\n\n")
     let request = AgentSendRequest(threadID: AgentThreadID(), prompt: prompt, workingDirectory: directory,
-                                   model: model, contextText: instructions, allowedTools: [])
+                                   model: model, allowedTools: [])
     return try await withTaskCancellationHandler {
       defer { Task {
         await client.cancel(turn: request.turnID)

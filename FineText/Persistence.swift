@@ -50,6 +50,8 @@ import SwiftData
   /// JSON `PresetSnapshot`, refreshed from the catalog when the rewrite is added or run.
   var presetSnapshotData: Data?
   var toneRaw = Tone.casual.rawValue
+  /// nil preserves the source language, including for rewrites saved by older builds.
+  var targetLanguageCode: String?
   var providerID = UUID()
   var modelID = ""
   var output = ""
@@ -84,6 +86,20 @@ import SwiftData
   var plainOutput: String { StructuredOutput.plainText(output, fields: fields) }
   var characterLimit: Int? { isCustomPlatform ? nil : preset?.characterLimit }
   var defaultTone: Tone { isCustomPlatform ? .natural : preset?.defaultTone ?? .natural }
+
+  var targetLanguage: Language? {
+    get { targetLanguageCode.map(Language.named(code:)) }
+    set { targetLanguageCode = newValue?.code }
+  }
+
+  var targetLanguageTitle: String { targetLanguage?.localizedName ?? LocalizableKey.sameAsOriginal.string }
+
+  var outputLanguageInstruction: String {
+    if let language = targetLanguage {
+      return "Write the finished text in \(language.name) (\(language.code)), even when the source uses another language. This output language overrides language instructions in the platform guidelines. Preserve template placeholders, field tags, links and proper names."
+    }
+    return "Write in the same language as the original text."
+  }
 
   var tone: Tone {
     get { Tone(rawValue: toneRaw) ?? defaultTone }
@@ -130,6 +146,9 @@ import SwiftData
   var modelID = ""
   var instruction = ""
   var sizeRaw = ImageSize.square.rawValue
+  var animatedGIF = false
+  var gifFrameCount = 9
+  var gifFrameDurationMS = 200
   @Attribute(.externalStorage) var imageData: Data?
   /// Ask for a cut-out subject on a transparent background.
   var transparentBackground = false
