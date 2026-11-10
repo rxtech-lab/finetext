@@ -23,6 +23,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   let context: ModelContext
   let providers: ProviderStore
   let preferences: Preferences
+  let presets: PresetStore
 
   private(set) var session: RefinementSession
   var tab: WorkTab = .rewrite
@@ -30,14 +31,17 @@ enum WorkTab: String, CaseIterable, Identifiable {
   var toast: Toast?
   private(set) var charges: [GenerationCharge] = []
   private(set) var statuses: [UUID: JobStatus] = [:]
+  /// Unscored round output is visible while running, but never replaces the saved best result.
+  private(set) var refinementPreviews: [UUID: String] = [:]
   private var tasks: [UUID: Task<Void, Never>] = [:]
   private var taskTokens: [UUID: UUID] = [:]
   private var toastTask: Task<Void, Never>?
 
-  init(container: ModelContainer, providers: ProviderStore, preferences: Preferences) {
+  init(container: ModelContainer, providers: ProviderStore, preferences: Preferences, presets: PresetStore) {
     context = container.mainContext
     self.providers = providers
     self.preferences = preferences
+    self.presets = presets
     charges = (try? context.fetch(FetchDescriptor<GenerationCharge>())) ?? []
     var descriptor = FetchDescriptor<RefinementSession>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
     descriptor.fetchLimit = 1
@@ -53,6 +57,11 @@ enum WorkTab: String, CaseIterable, Identifiable {
     for charge in charges where charge.costSource == nil && charge.costUSD == 0 {
       charge.costUSD = nil
       charge.costSource = "unverified"
+    }
+    // Rewrites from builds with hardcoded platforms share their ids with cloud presets.
+    let legacy = FetchDescriptor<RewriteItem>(predicate: #Predicate { $0.presetSnapshotData == nil && $0.customPlatformID == nil })
+    for item in (try? context.fetch(legacy)) ?? [] {
+      if let entry = presets.entry(id: item.platformRaw) { item.preset = PresetSnapshot(entry) }
     }
     try? context.save()
   }
@@ -143,10 +152,11 @@ enum WorkTab: String, CaseIterable, Identifiable {
   // MARK: Add
 
   @discardableResult
-  func addRewrite(platform: Platform, model: ModelRef) -> RewriteItem {
-    preferences.remember(platform: platform)
+  func addRewrite(preset entry: PresetEntry, model: ModelRef) -> RewriteItem {
+    preferences.remember(preset: entry.preset)
     preferences.remember(model, for: .rewrite)
-    let item = RewriteItem(platform: platform, tone: preferences.tone(for: platform), model: model)
+    let item = RewriteItem(presetID: entry.preset.id, tone: preferences.tone(for: entry.preset), model: model)
+    item.preset = PresetSnapshot(entry)
     session.rewrites.append(item)
     AppAnalytics.log(.itemAdded, rewriteParameters(item))
     touch()
@@ -158,7 +168,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   func addRewrite(customPlatform: CustomPlatform, model: ModelRef) -> RewriteItem {
     preferences.remember(customPlatform: customPlatform)
     preferences.remember(model, for: .rewrite)
-    let item = RewriteItem(platform: .message, tone: .natural, model: model)
+    let item = RewriteItem(presetID: "message", tone: .natural, model: model)
     item.customPlatformID = customPlatform.id
     item.customPlatformName = customPlatform.name
     item.customPlatformInstruction = customPlatform.instruction
@@ -287,7 +297,9 @@ enum WorkTab: String, CaseIterable, Identifiable {
     let text = originalText.trimmed
     guard !text.isEmpty else { return flash(LocalizableKey.addYourOriginalPostFirst.string, symbol: "exclamationmark.triangle", isError: true) }
     let id = item.id
-    let messages = Prompts.rewrite(text, platform: item.platform, tone: item.tone, customName: item.customPlatformName, customInstruction: item.customPlatformInstruction)
+    // Use the latest downloaded version of the preset; the snapshot covers presets that were removed.
+    if !item.isCustomPlatform, let entry = presets.entry(id: item.platformRaw) { item.preset = PresetSnapshot(entry) }
+    let messages = Prompts.rewrite(text, item: item)
     preferences.setTone(item.tone, for: item)
     let model = item.model
     var parameters = rewriteParameters(item)
@@ -304,6 +316,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
       if let target = item.targetAIScore, let score = item.finalAIScore { result["ai_target_reached"] = score <= target }
       return result
     }) {
+      self.refinementPreviews[id] = nil
       item.refinementSource = text
       item.output = ""
       item.note = nil
@@ -430,6 +443,10 @@ enum WorkTab: String, CaseIterable, Identifiable {
   }
 
   private func humanize(_ item: RewriteItem, id: UUID) async throws {
+    let token = taskTokens[id]
+    defer {
+      if taskTokens[id] == token { refinementPreviews[id] = nil }
+    }
     let defaults = UserDefaults.standard
     let mode = HumanizationMode.selected(in: defaults)
     let rounds = defaults.integer(forKey: DefaultsKey.humanizeRounds)
@@ -444,12 +461,14 @@ enum WorkTab: String, CaseIterable, Identifiable {
     do {
       if detector != .disabled {
         do {
-          try AIDetector.validate(item.output)
+          try AIDetector.validate(item.plainOutput)
           guard await AIDetector.shared.isInstalled(detector) else { throw AIDetectorError.notReady }
+          let fields = item.fields
           scoring = { [weak self] text in
             try Task.checkCancellation()
             self?.statuses[id] = .running(LocalizableKey.checkingAIScore.string)
-            return try await AIDetector.shared.score(text, engine: detector)
+            // Score the readable text, not the field tags.
+            return try await AIDetector.shared.score(StructuredOutput.plainText(text, fields: fields), engine: detector)
           }
         } catch {
           if mode == .automatic { throw error }
@@ -459,23 +478,37 @@ enum WorkTab: String, CaseIterable, Identifiable {
       if mode == .automatic, scoring == nil { throw AIDetectorError.notReady }
       item.targetAIScore = mode == .automatic ? target : nil
       item.detectorEngineRaw = scoring == nil ? nil : detector.rawValue
-      _ = try await HumanizationLoop.run(
+      let result = try await HumanizationLoop.run(
         text: item.output, mode: mode, rounds: max(1, rounds), target: target, score: scoring,
         refine: { [weak self] text, round in
           guard let self else { throw CancellationError() }
           try Task.checkCancellation()
           let status = LocalizableKey.humanizingRound.format(round)
+          self.refinementPreviews[id] = text
           self.statuses[id] = .running(status)
           if engine == .translateGemma {
             guard await TranslationEngine.shared.isInstalled(translationModel) else {
               throw MLXHubError.notDownloaded
             }
+            // Round-trip translation would mangle field tags, so translate each field on its own.
+            if let fields = item.fields, var values = StructuredOutput.parse(text, fields: fields) {
+              for field in fields where !(values[field.id] ?? "").trimmed.isEmpty {
+                values[field.id] = try await TranslationEngine.shared.humanize(values[field.id]!, rounds: 1, pivot: pivot, model: translationModel) { _ in }
+              }
+              return StructuredOutput.compose(values, fields: fields)
+            }
             return try await TranslationEngine.shared.humanize(text, rounds: 1, pivot: pivot, model: translationModel) { _ in }
           }
-          let messages = Prompts.humanize(text, source: item.refinementSource ?? self.originalText, item: item)
-          let raw = try await self.chat(rewriteModel, messages: messages, id: id, status: status) { _ in }
+          let messages = Prompts.humanize(text, source: item.refinementSource ?? self.originalText, item: item, round: round)
+          var streamed = ""
+          let raw = try await self.chat(rewriteModel, messages: messages, id: id, status: status) { [weak self] delta in
+            guard !Task.isCancelled, self?.taskTokens[id] == token else { return }
+            streamed += delta
+            self?.refinementPreviews[id] = streamed
+          }
           return Prompts.clean(raw)
         },
+        preview: { [weak self] text in self?.refinementPreviews[id] = text },
         update: { [weak self] result in
           if result.rounds == 0 { item.initialAIScore = result.score }
           item.output = result.text
@@ -485,6 +518,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
           self?.save()
         }
       )
+      if result.stoppedForPlateau { item.note = LocalizableKey.humanizationPlateau.string }
     } catch is CancellationError {
       throw CancellationError()
     } catch let error as URLError where error.code == .cancelled {
@@ -497,7 +531,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
 
   func sourceText(for item: TranslationItem) -> String {
     if let rewriteID = item.sourceRewriteID, let rewrite = session.rewrites.first(where: { $0.id == rewriteID }) {
-      return rewrite.output
+      return rewrite.plainOutput
     }
     return originalText
   }
@@ -698,7 +732,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   private func rewriteParameters(_ item: RewriteItem) -> [String: Any] {
     AppAnalytics.modelParameters(item.model, providers: providers).merging([
       "feature": "rewrite",
-      "platform": item.customPlatformID == nil ? item.platform.rawValue : "custom",
+      "platform": item.customPlatformID == nil ? item.platformRaw : "custom",
       "tone": item.tone.rawValue,
     ]) { _, new in new }
   }
@@ -720,7 +754,7 @@ enum WorkTab: String, CaseIterable, Identifiable {
   }
 
   private func analyticsFeature(of text: String) -> String {
-    if session.rewrites.contains(where: { $0.output == text }) { return "rewrite" }
+    if session.rewrites.contains(where: { $0.output == text || $0.plainOutput == text }) { return "rewrite" }
     if session.translations.contains(where: { $0.output == text }) { return "translate" }
     return "other"
   }
@@ -734,15 +768,18 @@ enum WorkTab: String, CaseIterable, Identifiable {
 // MARK: - Prompts
 
 enum Prompts {
-  static func humanize(_ text: String, source: String, item: RewriteItem) -> [ChatMessage] {
+  static func humanize(_ text: String, source: String, item: RewriteItem, round: Int) -> [ChatMessage] {
     [
       ChatMessage(role: "system", content: """
-      Edit the draft into natural writing for \(item.customPlatformName ?? item.platform.promptTitle).
+      Edit the draft into natural writing for \(platformName(item)).
       Tone: \(item.tone.guidance).
-      \(item.customPlatformInstruction ?? item.platform.guidelines)
+      \(guidelines(item))
       \(humanStyle)
+      This is editing round \(round). Produce a revised draft, not a copy of the input.
+      \(HumanizationLoop.editingFocus(round: round))
       Preserve all facts, meaning, links and the original language. The original is the source of truth.
       Do not invent experiences or add errors. Return only the finished text.
+      \(item.fields.map { "Keep every field tag of the draft.\n" + StructuredOutput.formatInstruction($0) } ?? "")
       """),
       ChatMessage(role: "user", content: "Original:\n\(source)\n\nDraft to improve:\n\(text)"),
     ]
@@ -753,17 +790,27 @@ enum Prompts {
   "let's dive in", avoid overusing em dashes, and do not add emojis unless they suit the platform and tone.
   """
 
-  static func rewrite(_ text: String, platform: Platform, tone: Tone, customName: String? = nil, customInstruction: String? = nil) -> [ChatMessage] {
-    [
+  static func platformName(_ item: RewriteItem) -> String {
+    item.customPlatformName ?? item.preset?.promptTitle ?? item.platformRaw
+  }
+
+  static func guidelines(_ item: RewriteItem) -> String {
+    item.customPlatformInstruction ?? item.preset?.guidelines(tone: item.tone) ?? ""
+  }
+
+  static func rewrite(_ text: String, item: RewriteItem) -> [ChatMessage] {
+    let tone = item.tone
+    return [
       ChatMessage(role: "system", content: """
-      You are an expert editor who adapts posts for \(customName ?? platform.promptTitle).
+      You are an expert editor who adapts posts for \(platformName(item)).
       Tone: \(tone.rawValue.capitalized) — \(tone.guidance).
       Platform guidelines:
-      \(customInstruction ?? platform.guidelines)
+      \(guidelines(item))
       Keep the original meaning and facts; never invent claims, numbers or links. \
       Write in the same language as the original post.
       \(humanStyle)
       Reply with the finished post only — no preamble, no explanations, no surrounding quotes.
+      \(item.fields.map(StructuredOutput.formatInstruction) ?? "")
       """),
       ChatMessage(role: "user", content: text),
     ]

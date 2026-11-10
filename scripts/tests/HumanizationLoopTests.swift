@@ -43,6 +43,51 @@ enum AIDetectorError: Error { case notReady, emptyText }
     )
     expect(unchanged.rounds == 3 && unchanged.text == "original" && unchanged.score == 80,
            "Three equal scores stop automatic checking and preserve the original")
+    expect(unchanged.stoppedForPlateau, "Report why unchanged output was retained")
+
+    var scoreCalls = 0
+    let echoed = try await HumanizationLoop.run(
+      text: "original", mode: .automatic, rounds: 1, target: 20,
+      score: { _ in scoreCalls += 1; return 80 },
+      refine: { text, _ in "\n\(text)\n" }, update: { _ in }
+    )
+    expect(echoed.rounds == 3 && echoed.stoppedForPlateau && scoreCalls == 1,
+           "Echoed input counts toward plateau without re-running the detector")
+
+    var previews: [String] = []
+    var inputs: [String] = []
+    let previewed = try await HumanizationLoop.run(
+      text: "0", mode: .manual, rounds: 3, target: 0,
+      score: { text in
+        if text != "0" { expect(previews.last == text, "Show each candidate before slow scoring") }
+        return text == "0" ? 50 : 80
+      },
+      refine: { text, round in inputs.append(text); return String(round) },
+      preview: { previews.append($0) }, update: { _ in }
+    )
+    expect(previews == ["1", "2", "3"] && inputs == ["0", "1", "2"],
+           "Preview every round, and refine the previous candidate rather than the retained best")
+    expect(previewed.text == "0" && previewed.score == 50, "Previews never replace the saved best")
+    expect(Set((1...3).map { HumanizationLoop.editingFocus(round: $0) }).count == 3,
+           "Successive rounds use different editing strategies")
+
+    var retainedText = ""
+    var pendingText = ""
+    let interrupted = Task { @MainActor in
+      try await HumanizationLoop.run(
+        text: "saved best", mode: .manual, rounds: 2, target: 0,
+        score: { text in
+          if text != "saved best" { try await Task.sleep(for: .seconds(10)) }
+          return 50
+        }, refine: { _, _ in "unscored draft" },
+        preview: { pendingText = $0 }, update: { retainedText = $0.text }
+      )
+    }
+    while pendingText.isEmpty { try await Task.sleep(for: .milliseconds(1)) }
+    interrupted.cancel()
+    do { _ = try await interrupted.value; fatalError("Scoring must cancel") } catch is CancellationError {}
+    expect(pendingText == "unscored draft" && retainedText == "saved best",
+           "Cancellation during scoring never commits the preview")
 
     let plateauScores = [90.0, 60, 70, 80, 75]
     let plateau = try await HumanizationLoop.run(

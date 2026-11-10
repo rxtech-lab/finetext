@@ -1,0 +1,61 @@
+{
+  "structuredContent": {
+    "items": [
+      {
+        "path": "/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v004.mp4",
+        "duration": 15,
+        "version": 4,
+        "caption_files": [],
+        "id": "C20A8EDF-A35E-4109-83E4-54E9519C87CF",
+        "height": 1080,
+        "width": 1920,
+        "codec": "h264",
+        "audio": "aac",
+        "createdAt": "2026-11-09T17:19:49Z",
+        "fps": 60
+      },
+      {
+        "duration": 15,
+        "width": 1920,
+        "height": 1080,
+        "caption_files": [],
+        "createdAt": "2026-11-09T17:10:38Z",
+        "version": 3,
+        "fps": 60,
+        "id": "9D8844F4-5C99-46B8-9CA9-F8C931F4890F",
+        "path": "/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v003.mp4",
+        "codec": "h264"
+      },
+      {
+        "createdAt": "2026-11-09T17:06:07Z",
+        "codec": "h264",
+        "id": "1E3C2B74-4612-4903-8A41-30EF099FAE65",
+        "fps": 60,
+        "duration": 15,
+        "version": 2,
+        "caption_files": [],
+        "path": "/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v002.mp4",
+        "width": 1920,
+        "height": 1080
+      },
+      {
+        "height": 1080,
+        "caption_files": [],
+        "duration": 15,
+        "fps": 60,
+        "version": 1,
+        "path": "/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v001.mp4",
+        "codec": "h264",
+        "createdAt": "2026-11-09T17:03:04Z",
+        "width": 1920,
+        "id": "BBFDD629-C02D-44D2-8E4C-50766A924BD9"
+      }
+    ]
+  },
+  "content": [
+    {
+      "type": "text",
+      "text": "[\n  {\n    \"path\": \"/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v004.mp4\",\n    \"duration\": 15,\n    \"version\": 4,\n    \"caption_files\": [],\n    \"id\": \"C20A8EDF-A35E-4109-83E4-54E9519C87CF\",\n    \"height\": 1080,\n    \"width\": 1920,\n    \"codec\": \"h264\",\n    \"audio\": \"aac\",\n    \"createdAt\": \"2026-11-09T17:19:49Z\",\n    \"fps\": 60\n  },\n  {\n    \"duration\": 15,\n    \"width\": 1920,\n    \"height\": 1080,\n    \"caption_files\": [],\n    \"createdAt\": \"2026-11-09T17:10:38Z\",\n    \"version\": 3,\n    \"fps\": 60,\n    \"id\": \"9D8844F4-5C99-46B8-9CA9-F8C931F4890F\",\n    \"path\": \"/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v003.mp4\",\n    \"codec\": \"h264\"\n  },\n  {\n    \"createdAt\": \"2026-11-09T17:06:07Z\",\n    \"codec\": \"h264\",\n    \"id\": \"1E3C2B74-4612-4903-8A41-30EF099FAE65\",\n    \"fps\": 60,\n    \"duration\": 15,\n    \"version\": 2,\n    \"caption_files\": [],\n    \"path\": \"/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v002.mp4\",\n    \"width\": 1920,\n    \"height\": 1080\n  },\n  {\n    \"height\": 1080,\n    \"caption_files\": [],\n    \"duration\": 15,\n    \"fps\": 60,\n    \"version\": 1,\n    \"path\": \"/Users/qiweili/Movies/FineText.rxfilmstudio/Renders/Sequences/72B2F927-E4DA-42FB-B4CE-997CEA70BA26/v001.mp4\",\n    \"codec\": \"h264\",\n    \"createdAt\": \"2026-11-09T17:03:04Z\",\n    \"width\": 1920,\n    \"id\": \"BBFDD629-C02D-44D2-8E4C-50766A924BD9\"\n  }\n]"
+    }
+  ]
+}

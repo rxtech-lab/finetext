@@ -61,6 +61,8 @@ struct DeleteButton: View {
 
 struct ModelPickerMenu: View {
   @Environment(ProviderStore.self) private var providers
+  @Environment(Preferences.self) private var preferences
+  @Environment(\.openSettings) private var openSettings
   let kind: ModelKind
   let purpose: Preferences.Purpose
   let current: ModelRef
@@ -68,8 +70,9 @@ struct ModelPickerMenu: View {
 
   var body: some View {
     LabeledContent(LocalizableKey.model.string) {
-      Menu(providers.displayName(current)) {
-        ModelMenuItems(kind: kind, purpose: purpose, onPick: onPick)
+      LazyPullDownMenu(title: providers.displayName(current)) {
+        ModelMenuEntries(providers: providers, preferences: preferences, openSettings: openSettings)
+          .entries(kind: kind, purpose: purpose, onPick: onPick)
       }
       .fixedSize()
     }
@@ -108,13 +111,14 @@ struct RewriteDetailView: View {
           }
           RefinementResultView(
             original: item.refinementSource ?? workspace.originalText,
-            output: $item.output, status: status, limit: item.characterLimit, assessment: item
+            output: $item.output, status: status, limit: item.characterLimit, assessment: item,
+            preview: workspace.refinementPreviews[id], fields: item.fields
           )
         }
         .padding(14)
         Divider()
         ActionBar(status: status, hasOutput: !item.output.isEmpty, runTitle: item.output.isEmpty ? LocalizableKey.rewrite.string : LocalizableKey.regenerate.string,
-                  onRun: { workspace.run(item) }, onStop: { workspace.stop(id) }, onCopy: { workspace.copy(item.output) })
+                  onRun: { workspace.run(item) }, onStop: { workspace.stop(id) }, onCopy: { workspace.copy(item.plainOutput) })
       }
     } else {
       MissingItemView()

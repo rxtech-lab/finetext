@@ -15,21 +15,17 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case afterRefinement
   case showBeforeRefinement
   case showAfterRefinement
-  case postVariant
-  case commentVariant
-  case chatVariant
-  case titleVariant
-  case descriptionVariant
-  case taglineVariant
-  case makerCommentVariant
-  case replyVariant
-  case threadVariant
   case customPlatforms
   case noCustomPlatforms
   case customPlatformsHint
   case newCustomPlatform
   case editCustomPlatform
   case platformName
+  case customPlatformFolder
+  case customPlatformFolderPrompt
+  case customPlatformFolderHint
+  case topLevel
+  case chooseExistingMenu
   case rewriteInstructions
   case customInstructionHint
   case deleteCustomPlatform
@@ -180,7 +176,6 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case removeModel
   case removeTheDownloadedTranslategemmaModel
   case youCanDownloadItAgainAtAnyTime
-  case blogPost
   case professional
   case casual
   case witty
@@ -197,6 +192,19 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case cleared
   case sessionDeleted
   case copiedToClipboard
+  case copyField
+  case presets
+  case presetsVersion
+  case presetsLastChecked
+  case never
+  case updateNow
+  case presetsDescription
+  case updatingPresets
+  case presetsUpdated
+  case presetsUpToDate
+  case presetsUpdateFailed
+  case presetsNeedNewerApp
+  case presetsEmpty
   case removed
   case starting
   case addYourOriginalPostFirst
@@ -272,7 +280,6 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case checkingTransparency
   case removingGreenScreen
 
-  case message
   case natural
   case onThisMac
   case localModels
@@ -366,6 +373,8 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case checkingAIScore
   case humanizingRound
   case humanizationStopped
+  case humanizationPlateau
+  case bestAIScoreValue
   case aiScoreValue
   case initialRewriteScore
   case finalAIScore

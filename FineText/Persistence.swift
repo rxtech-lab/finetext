@@ -45,7 +45,10 @@ import SwiftData
   var customPlatformID: UUID?
   var customPlatformName: String?
   var customPlatformInstruction: String?
-  var platformRaw = Platform.x.rawValue
+  /// The cloud preset id (older builds stored the same ids as enum raw values).
+  var platformRaw = "x"
+  /// JSON `PresetSnapshot`, refreshed from the catalog when the rewrite is added or run.
+  var presetSnapshotData: Data?
   var toneRaw = Tone.casual.rawValue
   var providerID = UUID()
   var modelID = ""
@@ -61,21 +64,29 @@ import SwiftData
   var humanizationRounds = 0
   var session: RefinementSession?
 
-  init(platform: Platform, tone: Tone, model: ModelRef) {
-    platformRaw = platform.rawValue
+  init(presetID: String, tone: Tone, model: ModelRef) {
+    platformRaw = presetID
     toneRaw = tone.rawValue
     providerID = model.providerID
     modelID = model.modelID
   }
 
-  var isCustomPlatform: Bool { customPlatformID != nil }
-  var platformTitle: String { customPlatformName ?? platform.title }
-  var platformSymbol: String { isCustomPlatform ? "slider.horizontal.3" : platform.symbol }
-  var characterLimit: Int? { isCustomPlatform ? nil : platform.characterLimit }
+  var preset: PresetSnapshot? {
+    get { presetSnapshotData.flatMap { try? JSONDecoder().decode(PresetSnapshot.self, from: $0) } }
+    set { presetSnapshotData = newValue.flatMap { try? JSONEncoder().encode($0) } }
+  }
 
-  var platform: Platform { Platform(rawValue: platformRaw) ?? .x }
+  var isCustomPlatform: Bool { customPlatformID != nil }
+  var platformTitle: String { customPlatformName ?? preset?.title ?? platformRaw }
+  var platformSymbol: String { isCustomPlatform ? "slider.horizontal.3" : preset?.symbol ?? "text.bubble" }
+  var fields: [PresetField]? { isCustomPlatform ? nil : preset?.fields }
+  /// Readable output: structured fields become labelled text.
+  var plainOutput: String { StructuredOutput.plainText(output, fields: fields) }
+  var characterLimit: Int? { isCustomPlatform ? nil : preset?.characterLimit }
+  var defaultTone: Tone { isCustomPlatform ? .natural : preset?.defaultTone ?? .natural }
+
   var tone: Tone {
-    get { Tone(rawValue: toneRaw) ?? platform.defaultTone }
+    get { Tone(rawValue: toneRaw) ?? defaultTone }
     set { toneRaw = newValue.rawValue }
   }
   var model: ModelRef {

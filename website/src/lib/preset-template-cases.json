@@ -1,0 +1,38 @@
+{
+  "render": [
+    { "name": "plain text", "template": "Hello { world }", "context": {}, "expected": "Hello { world }" },
+    { "name": "variable", "template": "Tone: {{ tone }}.", "context": { "tone": "Witty" }, "expected": "Tone: Witty." },
+    { "name": "nested path", "template": "{{ preset.title }}", "context": { "preset": { "title": "X Post" } }, "expected": "X Post" },
+    { "name": "missing renders empty", "template": "[{{ nope }}][{{ preset.nope }}]", "context": { "preset": {} }, "expected": "[][]" },
+    { "name": "integer", "template": "at most {{ character_limit }} characters", "context": { "character_limit": 280 }, "expected": "at most 280 characters" },
+    { "name": "filters", "template": "{{ tone | upper }} {{ tone | lower }} {{ name | capitalize }} {{ name | title }}", "context": { "tone": "Witty", "name": "hello wORLD" }, "expected": "WITTY witty Hello world Hello World" },
+    { "name": "trim length replace", "template": "{{ s | trim }}|{{ s | trim | length }}|{{ s | trim | replace(\"b\", \"B\") }}", "context": { "s": "  abc  " }, "expected": "abc|3|aBc" },
+    { "name": "default", "template": "{{ missing | default(\"none\") }} {{ empty | default('x') }} {{ zero | default(5) }}", "context": { "empty": "", "zero": 0 }, "expected": "none x 0" },
+    { "name": "if true", "template": "{% if character_limit %}limit {{ character_limit }}{% endif %}", "context": { "character_limit": 280 }, "expected": "limit 280" },
+    { "name": "if missing", "template": "a{% if character_limit %}limit{% endif %}b", "context": {}, "expected": "ab" },
+    { "name": "elif else", "template": "{% if n > 300 %}long{% elif n > 100 %}medium{% else %}short{% endif %}", "context": { "n": 280 }, "expected": "medium" },
+    { "name": "else branch", "template": "{% if n > 300 %}long{% elif n > 100 %}medium{% else %}short{% endif %}", "context": { "n": 3 }, "expected": "short" },
+    { "name": "comparison and logic", "template": "{% if tone_id == 'witty' and not formal or force %}yes{% else %}no{% endif %}", "context": { "tone_id": "witty", "formal": false }, "expected": "yes" },
+    { "name": "not equal", "template": "{% if tone_id != \"witty\" %}a{% else %}b{% endif %}", "context": { "tone_id": "casual" }, "expected": "a" },
+    { "name": "in", "template": "{% if 'zh' in app_language %}zh{% else %}other{% endif %}", "context": { "app_language": "zh-Hant" }, "expected": "zh" },
+    { "name": "parentheses", "template": "{% if (a or b) and c %}1{% else %}0{% endif %}", "context": { "a": false, "b": true, "c": true }, "expected": "1" },
+    { "name": "nested if", "template": "{% if a %}A{% if b %}B{% endif %}{% endif %}", "context": { "a": true, "b": true }, "expected": "AB" },
+    { "name": "comment", "template": "a{# hidden #}b", "context": {}, "expected": "ab" },
+    { "name": "block tags own lines", "template": "- one\n{% if limit %}\n- at most {{ limit }} characters\n{% endif %}\n- two\n", "context": { "limit": 280 }, "expected": "- one\n- at most 280 characters\n- two\n" },
+    { "name": "block tags own lines false", "template": "- one\n  {% if limit %}\n- limited\n  {% endif %}\n- two\n", "context": {}, "expected": "- one\n- two\n" },
+    { "name": "whitespace control", "template": "a   {{- x -}}   b", "context": { "x": "X" }, "expected": "aXb" },
+    { "name": "booleans", "template": "{{ yes }} {{ no }}", "context": { "yes": true, "no": false }, "expected": "True False" },
+    { "name": "string escapes", "template": "{{ \"a\\\"b\" }}", "context": {}, "expected": "a\"b" },
+    { "name": "unicode", "template": "{{ title }}：{{ title | length }}", "context": { "title": "電郵" }, "expected": "電郵：2" }
+  ],
+  "errors": [
+    { "name": "unclosed output", "template": "{{ tone" },
+    { "name": "missing endif", "template": "{% if a %}x" },
+    { "name": "stray endif", "template": "x{% endif %}" },
+    { "name": "unknown tag", "template": "{% for x in y %}{% endfor %}" },
+    { "name": "unknown filter", "template": "{{ tone | shout }}" },
+    { "name": "else not last", "template": "{% if a %}1{% else %}2{% elif b %}3{% endif %}" },
+    { "name": "bad expression", "template": "{{ a b }}" },
+    { "name": "empty expression", "template": "{{ }}" }
+  ]
+}

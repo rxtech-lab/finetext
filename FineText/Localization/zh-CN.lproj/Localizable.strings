@@ -122,7 +122,6 @@
 "removeModel" = "移除模型…";
 "removeTheDownloadedTranslategemmaModel" = "移除所选翻译模型？";
 "youCanDownloadItAgainAtAnyTime" = "你随时可以重新下载。";
-"blogPost" = "博客文章";
 "professional" = "专业";
 "casual" = "随意";
 "witty" = "诙谐";
@@ -213,7 +212,6 @@
 "regeneratingWithChanges" = "此模型无法编辑图片，正在按你的修改重新生成…";
 "checkingTransparency" = "正在检查透明度…";
 "removingGreenScreen" = "正在移除绿幕…";
-"message" = "消息";
 "natural" = "自然";
 "onThisMac" = "在这台 Mac 上";
 "localModels" = "本地模型";
@@ -288,10 +286,6 @@
 "customPlatformDeleted" = "已删除自定义平台";
 
 /* Platform variants */
-"postVariant" = "帖子";
-"commentVariant" = "评论";
-"replyVariant" = "回复";
-"threadVariant" = "串文";
 
 "claudeCodeNotInstalled" = "尚未安装 Claude Code。请运行 `brew install --cask claude-code` 安装。";
 "claudeCodeError" = "Claude Code：%@";
@@ -346,6 +340,8 @@
 "checkingAIScore" = "正在检查 AI 分数…";
 "humanizingRound" = "正在人性化 · 第 %lld 轮";
 "humanizationStopped" = "人性化已停止：%@";
+"humanizationPlateau" = "连续 3 轮 AI 评分未降低，已停止。已保留评分最低的文本；后续草稿可能有所不同。";
+"bestAIScoreValue" = "最低 AI 评分：%@/100";
 "aiScoreValue" = "AI 分数：%@/100";
 "initialRewriteScore" = "初始改写分数";
 "finalAIScore" = "最终 AI 分数";
@@ -391,13 +387,27 @@
 "noRecordedCosts" = "暂无费用记录";
 "historyTitle" = "历史标题";
 
-"chatVariant" = "聊天";
-"titleVariant" = "标题";
-"descriptionVariant" = "简介";
-"taglineVariant" = "宣传语";
-"makerCommentVariant" = "创作者留言";
 
 "newThread" = "新建会话";
 "privacy" = "隐私";
 "shareAnonymousUsageAnalytics" = "共享匿名使用数据";
 "analyticsDescription" = "仅发送你使用的功能和模型，绝不发送你的文字、图片或 API 密钥。";
+
+"copyField" = "拷贝%@";
+"presets" = "预设";
+"presetsVersion" = "预设版本";
+"presetsLastChecked" = "上次检查";
+"never" = "从未";
+"updateNow" = "立即更新";
+"presetsDescription" = "平台预设每 4 小时从 fintext.app 下载一次，离线时也可以使用。";
+"updatingPresets" = "正在更新预设…";
+"presetsUpdated" = "预设已更新";
+"presetsUpToDate" = "预设已是最新";
+"presetsUpdateFailed" = "无法更新预设：%@";
+"presetsNeedNewerApp" = "这些预设需要更新版本的 FineText。";
+"presetsEmpty" = "预设目录为空。";
+"customPlatformFolder" = "菜单";
+"customPlatformFolderPrompt" = "工作/客户";
+"customPlatformFolderHint" = "可选。用 / 分隔子菜单，例如“工作/客户”。留空则显示在顶层。";
+"topLevel" = "顶层";
+"chooseExistingMenu" = "选择现有菜单";
