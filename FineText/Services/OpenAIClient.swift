@@ -127,7 +127,7 @@ struct OpenAIClient: Sendable {
 
   /// Streams a chat completion, reporting each delta. Falls back to a plain JSON body when the
   /// endpoint ignores `stream`.
-  func streamChat(model: String, messages: [ChatMessage], onUsage: @MainActor @Sendable (GenerationUsage) -> Void = { _ in }, onDelta: @MainActor @Sendable (String) -> Void) async throws -> String {
+  func streamChat(model: String, messages: [ChatMessage], onUsage: @MainActor @Sendable @escaping (GenerationUsage) -> Void = { _ in }, onDelta: @MainActor @Sendable (String) -> Void) async throws -> String {
     var body: [String: Any] = [
       "model": model,
       "stream": true,
@@ -178,10 +178,15 @@ struct OpenAIClient: Sendable {
   // MARK: Images
 
   /// `transparent` asks GPT Image models for a PNG with an alpha channel.
-  func generateImage(model: String, prompt: String, size: String, transparent: Bool = false, onUsage: @MainActor @Sendable (GenerationUsage) -> Void = { _ in }) async throws -> Data {
+  func generateImage(model: String, prompt: String, size: String, transparent: Bool = false, animatedGIF: Bool = false, frameCount: Int = 9, frameDurationMS: Int = 200, onUsage: @MainActor @Sendable @escaping (GenerationUsage) -> Void = { _ in }) async throws -> Data {
+    if animatedGIF {
+      guard ImageOutput.supportsGIF(modelID: model) else { throw APIError.decoding(LocalizableKey.gifModelRequired.string) }
+      return try await generateAnimation(model: model, prompt: prompt, size: size, reference: nil,
+                                         frameCount: frameCount, frameDurationMS: frameDurationMS, onUsage: onUsage)
+    }
     var body: [String: Any] = ["model": model, "prompt": prompt, "n": 1, "size": size]
     if model.lowercased().contains("dall-e") { body["response_format"] = "b64_json" }
-    if transparent {
+    if transparent && !animatedGIF {
       body["background"] = "transparent"
       body["output_format"] = "png"
     }
@@ -194,7 +199,12 @@ struct OpenAIClient: Sendable {
 
   /// Edits an existing image (`POST /images/edits`, multipart). Throws `APIError.http` with 404/405/415/501
   /// when the endpoint or model doesn't support edits; see `isEditUnsupported`.
-  func editImage(model: String, image: Data, prompt: String, size: String, transparent: Bool = false, onUsage: @MainActor @Sendable (GenerationUsage) -> Void = { _ in }) async throws -> Data {
+  func editImage(model: String, image: Data, prompt: String, size: String, transparent: Bool = false, animatedGIF: Bool = false, frameCount: Int = 9, frameDurationMS: Int = 200, onUsage: @MainActor @Sendable @escaping (GenerationUsage) -> Void = { _ in }) async throws -> Data {
+    if animatedGIF {
+      guard ImageOutput.supportsGIF(modelID: model) else { throw APIError.decoding(LocalizableKey.gifModelRequired.string) }
+      return try await generateAnimation(model: model, prompt: prompt, size: size, reference: image,
+                                         frameCount: frameCount, frameDurationMS: frameDurationMS, onUsage: onUsage)
+    }
     let boundary = "FineText-\(UUID().uuidString)"
     var body = Data()
     func append(_ string: String) { body.append(Data(string.utf8)) }
@@ -205,12 +215,12 @@ struct OpenAIClient: Sendable {
     field("prompt", prompt)
     field("n", "1")
     field("size", size)
-    if transparent {
+    if transparent && !animatedGIF {
       field("background", "transparent")
       field("output_format", "png")
     }
     append("--\(boundary)\r\nContent-Disposition: form-data; name=\"image\"; filename=\"image.png\"\r\nContent-Type: image/png\r\n\r\n")
-    body.append(image)
+    body.append(ImageOutput.stillReference(image))
     append("\r\n--\(boundary)--\r\n")
 
     var request = try request("images/edits", method: "POST", timeout: 600)
@@ -221,6 +231,23 @@ struct OpenAIClient: Sendable {
     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
        let usage = GenerationUsage.parse(json, isVercelGateway: baseURL.host == "ai-gateway.vercel.sh") { await onUsage(usage) }
     return try await Self.decodeImage(data)
+  }
+
+  private func generateAnimation(model: String, prompt: String, size: String, reference: Data?,
+                                 frameCount: Int, frameDurationMS: Int,
+                                 onUsage: @MainActor @Sendable @escaping (GenerationUsage) -> Void) async throws -> Data {
+    let plan = GIFAnimationPlan(frameCount: frameCount, durationMS: frameDurationMS, size: size)
+    return try await plan.render(direction: prompt, reference: reference) { direction, size, reference, index, _ in
+      if let reference {
+        do {
+          return try await editImage(model: model, image: reference, prompt: direction, size: size, onUsage: onUsage)
+        } catch where index > 1 && Self.isEditUnsupported(error) {
+          // Do not restart an entire animation after earlier grids have already been billed.
+          throw APIError.decoding(LocalizableKey.gifContinuationUnsupported.string)
+        }
+      }
+      return try await generateImage(model: model, prompt: direction, size: size, onUsage: onUsage)
+    }
   }
 
   /// True when an edit failed because the provider has no edit endpoint for this model, so the caller

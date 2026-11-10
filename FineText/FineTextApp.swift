@@ -11,6 +11,8 @@ import SwiftUI
   @State private var gemma = TranslationModelManager()
   @State private var updater = AppUpdater()
   @State private var detector = AIDetectorManager()
+  /// Local MCP server for other apps; started at launch when enabled in Settings → MCP.
+  @State private var mcp: MCPServer
   private let container: ModelContainer
 
   init() {
@@ -25,7 +27,9 @@ import SwiftUI
     _providers = State(initialValue: providers)
     _preferences = State(initialValue: preferences)
     _presets = State(initialValue: presets)
-    _workspace = State(initialValue: Workspace(container: container, providers: providers, preferences: preferences, presets: presets))
+    let workspace = Workspace(container: container, providers: providers, preferences: preferences, presets: presets)
+    _workspace = State(initialValue: workspace)
+    _mcp = State(initialValue: MCPServer(tools: MCPTools(workspace: workspace)))
   }
 
   var body: some Scene {
@@ -51,6 +55,7 @@ import SwiftUI
         .environment(gemma)
         .environment(detector)
         .environment(updater)
+        .environment(mcp)
     }
   }
 }

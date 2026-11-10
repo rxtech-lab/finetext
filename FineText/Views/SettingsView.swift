@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SettingsTab: String {
-  case general, providers, local, humanizer
+  case general, providers, local, humanizer, mcp
 }
 
 struct SettingsView: View {
@@ -13,6 +13,7 @@ struct SettingsView: View {
       Tab(LocalizableKey.providers.string, systemImage: "server.rack", value: .providers) { ProvidersSettingsView() }
       Tab(LocalizableKey.localModels.string, systemImage: "cpu", value: .local) { LocalModelsSettingsView() }
       Tab(LocalizableKey.humanizer.string, systemImage: "character.bubble", value: .humanizer) { HumanizerSettingsView() }
+      Tab("MCP", systemImage: "point.3.connected.trianglepath.dotted", value: .mcp) { MCPSettingsView() }
     }
     .frame(width: 580, height: 460)
     .modelDownloadOverlay()
@@ -117,7 +118,7 @@ struct GeneralSettingsView: View {
 }
 
 /// A transient status capsule shown over the Settings form.
-private struct StatusOverlay: View {
+struct StatusOverlay: View {
   let toast: Toast
   var progress = false
 

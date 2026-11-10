@@ -411,3 +411,64 @@
 "customPlatformFolderHint" = "可選。用 / 分隔子選單，例如「工作/客戶」。留空則顯示在最上層。";
 "topLevel" = "最上層";
 "chooseExistingMenu" = "選擇現有選單";
+
+/* MCP server */
+"mcpServer" = "MCP 伺服器";
+"mcpEnableServer" = "啟用 MCP 伺服器";
+"mcpStatus" = "狀態";
+"mcpURL" = "URL";
+"mcpPort" = "埠";
+"mcpApplyPort" = "套用";
+"mcpDescription" = "此 Mac 上的其他 App（例如 vc-email 或 Claude Code）可以列出你的範本，並使用 FineText 改寫文字。每次改寫都會使用你的人性化與 AI 偵測設定。伺服器只監聽 127.0.0.1。";
+"mcpConnect" = "連接用戶端";
+"mcpTools" = "工具";
+"mcpRequests" = "請求";
+"mcpRecentRequests" = "最近的請求";
+"mcpRunningRequests" = "正在執行";
+"mcpViewRequestLog" = "查看請求記錄…";
+"mcpRunning" = "執行中";
+"mcpStarting" = "正在啟動…";
+"mcpStopped" = "已停止";
+"mcpFailed" = "失敗：%@";
+"mcpSucceeded" = "成功";
+"mcpCancelled" = "已取消";
+"mcpInvalidPort" = "請輸入 1024 至 65535 之間的埠";
+"mcpPortUpdated" = "MCP 伺服器現在使用埠 %lld";
+"mcpRequestLog" = "MCP 請求";
+"mcpNoRequests" = "暫無請求";
+"mcpNoRequestsHint" = "FineText 運行時，來自 MCP 用戶端的請求會顯示在這裡。";
+"mcpClearLog" = "清除記錄";
+"mcpClearLogConfirm" = "要清除請求記錄嗎？";
+"mcpClearLogMessage" = "已完成的請求會被移除，正在執行的請求會保留。";
+"mcpLogCleared" = "請求記錄已清除";
+"mcpMethod" = "方法";
+"mcpTool" = "工具";
+"mcpClient" = "用戶端";
+"mcpReceived" = "收到時間";
+"mcpProgress" = "進度";
+"mcpRequest" = "請求";
+"mcpResponse" = "回應";
+"targetLanguage" = "目標語言";
+"sameAsOriginal" = "與原文相同";
+
+"animatedGIF" = "動態 GIF";
+"imageOutput" = "影像輸出";
+"outputStillImage" = "輸出：靜態影像";
+"gifFrames" = "影格數：%lld";
+"gifFrameDuration" = "每格時長：%lld 毫秒";
+"gifLoopDuration" = "循環時長：%@ 秒";
+"gifSettingsHint" = "在創作指引中描述動作和循環。較長動畫使用多個網格，以上一個網格的末格引導下一個網格。每個網格獨立請求影像，可能產生費用。動作一致性取決於模型。";
+"gifModelRequired" = "GIF 輸出需要 GPT Image 2.6 Flare 或 Sunburst。";
+"gifProviderRequired" = "GIF 輸出需要 Codex 或 GPT Image 2.6 Flare 或 Sunburst。";
+"gifStillReturned" = "服務商傳回了靜態影像。請確認此模型和帳戶可使用 GIF 生成功能。";
+"gifSettingsSaved" = "已儲存影像輸出設定";
+
+
+"gifGridInvalid" = "無法解碼或合成動畫影格網格，請嘗試減少影格數後重新產生。";
+"gifAssembling" = "正在合成動畫影格…";
+"gifGeneratingGrid" = "正在產生動畫影格網格…";
+
+"gifGridProgress" = "正在產生動畫網格 %lld/%lld…";
+"gifGridCount" = "影像網格：%lld（每個網格請求一次影像）";
+
+"gifContinuationUnsupported" = "此服務商無法編輯影像以繼續產生下一個動畫網格。請選擇不超過 16 格，或使用支援影像編輯的服務商。";

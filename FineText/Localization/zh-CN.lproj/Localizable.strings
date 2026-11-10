@@ -411,3 +411,64 @@
 "customPlatformFolderHint" = "可选。用 / 分隔子菜单，例如“工作/客户”。留空则显示在顶层。";
 "topLevel" = "顶层";
 "chooseExistingMenu" = "选择现有菜单";
+
+/* MCP server */
+"mcpServer" = "MCP 服务器";
+"mcpEnableServer" = "启用 MCP 服务器";
+"mcpStatus" = "状态";
+"mcpURL" = "URL";
+"mcpPort" = "端口";
+"mcpApplyPort" = "应用";
+"mcpDescription" = "此 Mac 上的其他 App（例如 vc-email 或 Claude Code）可以列出你的模板，并使用 FineText 改写文字。每次改写都会使用你的人性化与 AI 检测设置。服务器只监听 127.0.0.1。";
+"mcpConnect" = "连接客户端";
+"mcpTools" = "工具";
+"mcpRequests" = "请求";
+"mcpRecentRequests" = "最近的请求";
+"mcpRunningRequests" = "正在运行";
+"mcpViewRequestLog" = "查看请求记录…";
+"mcpRunning" = "运行中";
+"mcpStarting" = "正在启动…";
+"mcpStopped" = "已停止";
+"mcpFailed" = "失败：%@";
+"mcpSucceeded" = "成功";
+"mcpCancelled" = "已取消";
+"mcpInvalidPort" = "请输入 1024 到 65535 之间的端口";
+"mcpPortUpdated" = "MCP 服务器现在使用端口 %lld";
+"mcpRequestLog" = "MCP 请求";
+"mcpNoRequests" = "暂无请求";
+"mcpNoRequestsHint" = "FineText 运行时，来自 MCP 客户端的请求会显示在这里。";
+"mcpClearLog" = "清除记录";
+"mcpClearLogConfirm" = "要清除请求记录吗？";
+"mcpClearLogMessage" = "已完成的请求会被移除，正在运行的请求会保留。";
+"mcpLogCleared" = "请求记录已清除";
+"mcpMethod" = "方法";
+"mcpTool" = "工具";
+"mcpClient" = "客户端";
+"mcpReceived" = "收到时间";
+"mcpProgress" = "进度";
+"mcpRequest" = "请求";
+"mcpResponse" = "响应";
+"targetLanguage" = "目标语言";
+"sameAsOriginal" = "与原文相同";
+
+"animatedGIF" = "动态 GIF";
+"imageOutput" = "图像输出";
+"outputStillImage" = "输出：静态图像";
+"gifFrames" = "帧数：%lld";
+"gifFrameDuration" = "每帧时长：%lld 毫秒";
+"gifLoopDuration" = "循环时长：%@ 秒";
+"gifSettingsHint" = "在创作指引中描述动作和循环。较长动画使用多个网格，以上一个网格的末帧引导下一个网格。每个网格单独请求图像，可能产生费用。动作一致性取决于模型。";
+"gifModelRequired" = "GIF 输出需要 GPT Image 2.6 Flare 或 Sunburst。";
+"gifProviderRequired" = "GIF 输出需要 Codex 或 GPT Image 2.6 Flare 或 Sunburst。";
+"gifStillReturned" = "服务商返回了静态图像。请确认此模型和账户可使用 GIF 生成功能。";
+"gifSettingsSaved" = "已保存图像输出设置";
+
+
+"gifGridInvalid" = "无法解码或合成动画帧网格，请尝试减少帧数后重新生成。";
+"gifAssembling" = "正在合成动画帧…";
+"gifGeneratingGrid" = "正在生成动画帧网格…";
+
+"gifGridProgress" = "正在生成动画网格 %lld/%lld…";
+"gifGridCount" = "图像网格：%lld（每个网格请求一次图像）";
+
+"gifContinuationUnsupported" = "此服务商无法编辑图像以继续生成下一个动画网格。请选择不超过 16 帧，或使用支持图像编辑的服务商。";

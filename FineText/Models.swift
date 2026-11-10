@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 
 // MARK: - Presets & tones
 
@@ -267,5 +268,215 @@ struct CostSummary {
       return "< " + 0.000001.formatted(.currency(code: "USD").precision(.fractionLength(6)))
     }
     return amount.formatted(.currency(code: "USD").precision(.fractionLength(2...6)))
+  }
+}
+
+/// GIF bytes must survive persistence, copying and export without being flattened to PNG.
+enum ImageOutput {
+  static func supportsGIF(modelID: String) -> Bool {
+    let id = modelID.lowercased().split(separator: "/").last.map(String.init) ?? ""
+    return id == "gpt-image-2.6-flare" || id.hasPrefix("gpt-image-2.6-flare-")
+      || id == "gpt-image-2.6-sunburst" || id.hasPrefix("gpt-image-2.6-sunburst-")
+  }
+
+  static func isGIF(_ data: Data) -> Bool {
+    ["GIF87a", "GIF89a"].contains(String(decoding: data.prefix(6), as: UTF8.self))
+  }
+
+  static func isAnimatedGIF(_ data: Data) -> Bool {
+    guard isGIF(data), let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }
+    return CGImageSourceGetCount(source) > 1
+  }
+
+  /// Image edits accept still references, so extract a PNG frame from an existing animation.
+  static func stillReference(_ data: Data) -> Data {
+    guard isGIF(data), let source = CGImageSourceCreateWithData(data as CFData, nil),
+          let frame = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return data }
+    let output = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(output, "public.png" as CFString, 1, nil) else { return data }
+    CGImageDestinationAddImage(destination, frame, nil)
+    return CGImageDestinationFinalize(destination) ? output as Data : data
+  }
+}
+
+/// One image request produces a contact sheet; ImageIO turns its cells into timed frames.
+struct GIFFrameGrid: Sendable {
+  let frameCount: Int
+  let durationMS: Int
+  let columns: Int
+  let rows: Int
+  let frameWidth: Int
+  let frameHeight: Int
+
+  init(frameCount: Int, durationMS: Int, size: String) {
+    self.frameCount = min(16, max(2, frameCount))
+    self.durationMS = min(2000, max(20, durationMS / 10 * 10))
+    columns = Int(ceil(sqrt(Double(self.frameCount))))
+    rows = (self.frameCount + columns - 1) / columns
+    let dimensions = size.split(separator: "x").compactMap { Int($0) }
+    if dimensions.count == 2, dimensions[0] > dimensions[1] {
+      frameWidth = 768; frameHeight = 512
+    } else if dimensions.count == 2, dimensions[0] < dimensions[1] {
+      frameWidth = 512; frameHeight = 768
+    } else {
+      frameWidth = 640; frameHeight = 640
+    }
+  }
+
+  var size: String { "\(columns * frameWidth)x\(rows * frameHeight)" }
+
+  func prompt(_ direction: String) -> String {
+    """
+    \(direction)
+
+    Deliver ONE still PNG animation sprite sheet, exactly \(columns) columns by \(rows) rows,
+    filling the entire \(size) canvas. Every cell is exactly \(frameWidth)x\(frameHeight) pixels.
+    The first \(frameCount) cells are consecutive frames of ONE seamless looping animation,
+    ordered left to right, then top to bottom. Each frame lasts \(durationMS) milliseconds.
+    Show progressive motion across cells; keep the subject identity, scale, camera, lighting,
+    background and position consistent. Make the last frame transition smoothly to the first.
+    If no motion is specified, use a subtle natural motion suitable for the subject.
+    No grid lines, borders, padding, gutters, labels, numbers, text or captions. All cells
+    have equal dimensions and touch their neighbours edge to edge. Keep the subject fully
+    inside each cell. Leave any unused trailing cells blank. Return a still sprite sheet,
+    not a GIF and not a single enlarged scene. An attached image is a visual reference;
+    redraw the complete animation grid to incorporate the requested changes.
+    """
+  }
+
+  func assemble(_ data: Data) throws -> Data {
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+          let sheet = CGImageSourceCreateImageAtIndex(source, 0, nil),
+          sheet.width >= columns, sheet.height >= rows else {
+      throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+    }
+    let output = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(output, "com.compuserve.gif" as CFString, frameCount, nil) else {
+      throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+    }
+    CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+    let cellWidth = sheet.width / columns
+    let cellHeight = sheet.height / rows
+    for index in 0..<frameCount {
+      try Task.checkCancellation()
+      let rect = CGRect(x: (index % columns) * cellWidth, y: (index / columns) * cellHeight,
+                        width: cellWidth, height: cellHeight)
+      guard let frame = sheet.cropping(to: rect) else {
+        throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+      }
+      // Materialize each crop into its own bitmap. GIF encoding must not retain the
+      // sprite sheet's shared backing buffer/row stride for a subimage.
+      guard let context = CGContext(data: nil, width: cellWidth, height: cellHeight,
+                                    bitsPerComponent: 8, bytesPerRow: cellWidth * 4,
+                                    space: CGColorSpaceCreateDeviceRGB(),
+                                    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+        throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+      }
+      context.setFillColor(CGColor(gray: 1, alpha: 1))
+      context.fill(CGRect(x: 0, y: 0, width: cellWidth, height: cellHeight))
+      context.draw(frame, in: CGRect(x: 0, y: 0, width: cellWidth, height: cellHeight))
+      guard let bitmap = context.makeImage() else { throw APIError.decoding(LocalizableKey.gifGridInvalid.string) }
+      let delay = Double(durationMS) / 1000
+      CGImageDestinationAddImage(destination, bitmap, [kCGImagePropertyGIFDictionary:
+        [kCGImagePropertyGIFDelayTime: delay, kCGImagePropertyGIFUnclampedDelayTime: delay]] as CFDictionary)
+    }
+    guard CGImageDestinationFinalize(destination) else { throw APIError.decoding(LocalizableKey.gifGridInvalid.string) }
+    return output as Data
+  }
+}
+
+/// Bounded sequential grids keep individual image requests within their pixel budget.
+struct GIFAnimationPlan: Sendable {
+  static let maximumFrames = 64
+  let grids: [GIFFrameGrid]
+  let frameCount: Int
+
+  init(frameCount: Int, durationMS: Int, size: String) {
+    self.frameCount = min(Self.maximumFrames, max(2, frameCount))
+    let count = (self.frameCount + 15) / 16
+    // Balance grids so a remainder of one never creates a one-frame sheet.
+    let total = self.frameCount
+    grids = (0..<count).map { index in
+      GIFFrameGrid(frameCount: total / count + (index < total % count ? 1 : 0),
+                   durationMS: durationMS, size: size)
+    }
+  }
+
+  func render(direction: String, reference: Data?,
+              generate: @Sendable (String, String, Data?, Int, Int) async throws -> Data) async throws -> Data {
+    var previous = reference.map(ImageOutput.stillReference)
+    var animations: [Data] = []
+    var offset = 0
+    for (index, grid) in grids.enumerated() {
+      try Task.checkCancellation()
+      var prompt = grid.prompt(direction)
+      if grids.count > 1 {
+        prompt += """
+
+        This is grid \(index + 1) of \(grids.count), containing global frames \(offset + 1) through \(offset + grid.frameCount)
+        of a single \(frameCount)-frame animation. These timeline instructions override per-sheet looping:
+        do NOT restart or loop the motion inside this grid. Continue the full motion over all \(frameCount) frames.
+        \(index > 0 ? "The attached image is the final frame of the previous grid. Begin with the NEXT moment after that frame; do not duplicate it. Preserve its identity, scale, background and camera." : "Establish the opening pose and begin the motion gradually.")
+        \(index == grids.count - 1 ? "Finish the overall motion so the final global frame loops back to the original opening pose." : "End with motion still in progress so the next grid can continue seamlessly.")
+        """
+      }
+      let sheet = try await generate(prompt, grid.size, previous, index + 1, grids.count)
+      try Task.checkCancellation()
+      let animation = try await Task.detached { try grid.assemble(sheet) }.value
+      animations.append(animation)
+      previous = try Self.lastFrame(animation)
+      offset += grid.frameCount
+    }
+    try Task.checkCancellation()
+    if animations.count == 1 { return animations[0] }
+    return try await Task.detached { try Self.join(animations, durationMS: grids[0].durationMS) }.value
+  }
+
+  private static func lastFrame(_ data: Data) throws -> Data {
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+          let frame = CGImageSourceCreateImageAtIndex(source, CGImageSourceGetCount(source) - 1, nil) else {
+      throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+    }
+    let output = NSMutableData()
+    guard let destination = CGImageDestinationCreateWithData(output, "public.png" as CFString, 1, nil) else {
+      throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+    }
+    CGImageDestinationAddImage(destination, frame, nil)
+    guard CGImageDestinationFinalize(destination) else { throw APIError.decoding(LocalizableKey.gifGridInvalid.string) }
+    return output as Data
+  }
+
+  private static func join(_ animations: [Data], durationMS: Int) throws -> Data {
+    let sources = try animations.map { data -> CGImageSource in
+      guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+        throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+      }
+      return source
+    }
+    let total = sources.reduce(0) { $0 + CGImageSourceGetCount($1) }
+    let output = NSMutableData()
+    guard let first = sources.first, let opening = CGImageSourceCreateImageAtIndex(first, 0, nil),
+          let destination = CGImageDestinationCreateWithData(output, "com.compuserve.gif" as CFString, total, nil) else {
+      throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+    }
+    CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+    for source in sources {
+      for index in 0..<CGImageSourceGetCount(source) {
+        try Task.checkCancellation()
+        guard let frame = CGImageSourceCreateImageAtIndex(source, index, nil),
+              let context = CGContext(data: nil, width: opening.width, height: opening.height,
+                                      bitsPerComponent: 8, bytesPerRow: opening.width * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+          throw APIError.decoding(LocalizableKey.gifGridInvalid.string)
+        }
+        context.draw(frame, in: CGRect(x: 0, y: 0, width: opening.width, height: opening.height))
+        guard let normalized = context.makeImage() else { throw APIError.decoding(LocalizableKey.gifGridInvalid.string) }
+        let delay = Double(durationMS) / 1000
+        CGImageDestinationAddImage(destination, normalized, [kCGImagePropertyGIFDictionary:
+          [kCGImagePropertyGIFDelayTime: delay, kCGImagePropertyGIFUnclampedDelayTime: delay]] as CFDictionary)
+      }
+    }
+    guard CGImageDestinationFinalize(destination) else { throw APIError.decoding(LocalizableKey.gifGridInvalid.string) }
+    return output as Data
   }
 }
