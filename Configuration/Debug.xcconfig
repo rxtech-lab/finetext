@@ -2,3 +2,10 @@
 SPARKLE_PUBLIC_KEY =
 // Rewrite presets from the local website (`bun run dev` in website/).
 PRESETS_URL = http:/$()/localhost:3000/api/presets
+// Flowcy agent API. Every configuration uses production.
+FLOWCY_BASE_URL = https:/$()/www.flowcy.dev
+// First-party rxlab-auth OAuth client for FineText (redirect finetext://oauth-callback).
+FLOWCY_OAUTH_CLIENT_ID = client_de18d5f7d1a8485e9f874728912385a3
+// Passkeys need the associated-domains entitlement; automatic Debug signing provides its profile.
+FLOWCY_PASSKEYS_ENABLED = YES
+FINETEXT_ENTITLEMENTS = Configuration/FineText-Debug.entitlements

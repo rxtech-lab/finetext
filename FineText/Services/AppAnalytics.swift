@@ -110,6 +110,7 @@ import Foundation
     if model.isLocal { return "local_mlx" }
     if providers.isCodex(model) { return "codex" }
     if providers.isClaudeCode(model) { return "claude_code" }
+    if providers.isFlowcy(model) { return "flowcy" }
     return providerType(baseURL: providers.provider(model.providerID)?.baseURL)
   }
 

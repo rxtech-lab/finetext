@@ -452,6 +452,46 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case gifGridCount
 
   case gifContinuationUnsupported
+  case flowcySignIn
+  case flowcyManageAccount
+  case flowcyNotSignedIn
+  case flowcySignedInAs
+  case flowcySignInTitle
+  case flowcySignInSubtitle
+  case flowcyDescription
+  case flowcyNotConfigured
+  case flowcyAccount
+  case flowcyName
+  case flowcyEmail
+  case flowcyServer
+  case flowcyModels
+  case flowcyNoModels
+  case flowcySignOut
+  case flowcySignOutConfirm
+  case flowcySignOutMessage
+  case flowcySigningOut
+  case flowcySignedOut
+  case flowcySignedIn
+  case flowcySignInRequired
+  case flowcySessionExpired
+  case flowcyLimitReached
+  case flowcyStreamFailed
+  case flowcyInterrupted
+  case platforms
+  case codingAgents
+  case flowcyUsage
+  case flowcyUsage5h
+  case flowcyUsage7d
+  case flowcyUsage30d
+  case flowcyUsageAmount
+  case flowcyUsageUnlimited
+  case flowcyUsageResets
+  case flowcyUsageEmpty
+  case flowcyUsageLoading
+  case flowcyUsageHint
+  case refreshUsage
+  case openInChrome
+  case openInBrowser
 
   var string: String {
     Bundle.main.localizedString(forKey: rawValue, value: nil, table: "Localizable")

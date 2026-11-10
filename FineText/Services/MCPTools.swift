@@ -188,6 +188,7 @@ import Foundation
     var ids = providers.providers.map(\.id)
     if providers.codex != nil { ids.append(ProviderStore.codexProvider.id) }
     if providers.claudeCode != nil { ids.append(ProviderStore.claudeCodeProvider.id) }
+    if providers.flowcy.isSignedIn { ids.append(ProviderStore.flowcyProvider.id) }
     ids.append(Provider.localID)
     return ids.flatMap { id in providers.models(for: id, kind: .text).map { ModelRef(providerID: id, modelID: $0.id) } }
   }

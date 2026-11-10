@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SettingsTab: String {
-  case general, providers, local, humanizer, mcp
+  case general, platforms, providers, agents, flowcy, local, humanizer, mcp
 }
 
 struct SettingsView: View {
@@ -10,12 +10,15 @@ struct SettingsView: View {
   var body: some View {
     TabView(selection: $tab) {
       Tab(LocalizableKey.general.string, systemImage: "gearshape", value: .general) { GeneralSettingsView() }
+      Tab(LocalizableKey.platforms.string, systemImage: "square.grid.2x2", value: .platforms) { PlatformsSettingsView() }
       Tab(LocalizableKey.providers.string, systemImage: "server.rack", value: .providers) { ProvidersSettingsView() }
+      Tab(LocalizableKey.codingAgents.string, systemImage: "terminal", value: .agents) { CodingAgentsSettingsView() }
+      Tab("Flowcy", systemImage: "cloud", value: .flowcy) { FlowcySettingsView() }
       Tab(LocalizableKey.localModels.string, systemImage: "cpu", value: .local) { LocalModelsSettingsView() }
       Tab(LocalizableKey.humanizer.string, systemImage: "character.bubble", value: .humanizer) { HumanizerSettingsView() }
       Tab("MCP", systemImage: "point.3.connected.trianglepath.dotted", value: .mcp) { MCPSettingsView() }
     }
-    .frame(width: 580, height: 460)
+    .frame(width: 700, height: 520)
     .modelDownloadOverlay()
     .onAppear { AppAnalytics.screen("settings_\(tab.rawValue)") }
     .onChange(of: tab) { AppAnalytics.screen("settings_\(tab.rawValue)") }
@@ -26,35 +29,11 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
   @Environment(AppUpdater.self) private var updater
-  @Environment(Preferences.self) private var preferences
-  @Environment(PresetStore.self) private var presets
-  @State private var showClaudeCode = false
-  @State private var presetStatus: Toast?
   @AppStorage(DefaultsKey.analyticsEnabled) private var analyticsEnabled = true
 
   var body: some View {
     @Bindable var updater = updater
     Form {
-      Section(LocalizableKey.defaultTonePerPlatform.string) {
-        ForEach(presets.entries) { entry in
-          Picker(entry.title, selection: Binding(get: { preferences.tone(for: entry.preset) }, set: { preferences.setTone($0, for: entry.preset) })) {
-            ForEach(Tone.allCases) { Text($0.title).tag($0) }
-          }
-        }
-      }
-      Section(LocalizableKey.presets.string) {
-        LabeledContent(LocalizableKey.presetsVersion.string, value: presets.catalog.version)
-        LabeledContent(LocalizableKey.presetsLastChecked.string) {
-          if let date = presets.lastChecked {
-            Text(date, format: .relative(presentation: .named))
-          } else {
-            Text(LocalizableKey.never.string)
-          }
-        }
-        Button(LocalizableKey.updateNow.string, action: updatePresets)
-          .disabled(presets.isRefreshing || PresetStore.configuredURL == nil)
-        Text(LocalizableKey.presetsDescription.string).font(.caption).foregroundStyle(.secondary)
-      }
       Section(LocalizableKey.images.string) {
         LabeledContent(LocalizableKey.quickSaveFolder.string) {
           Button("~/Pictures/FineText") {
@@ -63,10 +42,6 @@ struct GeneralSettingsView: View {
           }
           .buttonStyle(.link)
         }
-      }
-      CodexSettingsSection()
-      Section {
-        Button("Claude Code") { showClaudeCode = true }
       }
       Section(LocalizableKey.updates.string) {
         Toggle(LocalizableKey.automaticallyCheckForUpdates.string, isOn: $updater.automaticallyChecks)
@@ -85,7 +60,41 @@ struct GeneralSettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .sheet(isPresented: $showClaudeCode) { ClaudeCodeSetupSheet() }
+  }
+}
+
+// MARK: - Platforms
+
+/// Writing platforms: the preset catalog and each platform's default tone.
+struct PlatformsSettingsView: View {
+  @Environment(Preferences.self) private var preferences
+  @Environment(PresetStore.self) private var presets
+  @State private var presetStatus: Toast?
+
+  var body: some View {
+    Form {
+      Section(LocalizableKey.presets.string) {
+        LabeledContent(LocalizableKey.presetsVersion.string, value: presets.catalog.version)
+        LabeledContent(LocalizableKey.presetsLastChecked.string) {
+          if let date = presets.lastChecked {
+            Text(date, format: .relative(presentation: .named))
+          } else {
+            Text(LocalizableKey.never.string)
+          }
+        }
+        Button(LocalizableKey.updateNow.string, action: updatePresets)
+          .disabled(presets.isRefreshing || PresetStore.configuredURL == nil)
+        Text(LocalizableKey.presetsDescription.string).font(.caption).foregroundStyle(.secondary)
+      }
+      Section(LocalizableKey.defaultTonePerPlatform.string) {
+        ForEach(presets.entries) { entry in
+          Picker(entry.title, selection: Binding(get: { preferences.tone(for: entry.preset) }, set: { preferences.setTone($0, for: entry.preset) })) {
+            ForEach(Tone.allCases) { Text($0.title).tag($0) }
+          }
+        }
+      }
+    }
+    .formStyle(.grouped)
     .overlay(alignment: .bottom) {
       if presets.isRefreshing {
         StatusOverlay(Toast(message: LocalizableKey.updatingPresets.string, symbol: "arrow.triangle.2.circlepath"), progress: true)
@@ -143,56 +152,49 @@ struct StatusOverlay: View {
   }
 }
 
-struct ClaudeCodeSetupSheet: View {
+// MARK: - Claude Code
+
+/// Codex and Claude Code: local CLIs that FineText drives with your existing sign-ins.
+struct CodingAgentsSettingsView: View {
+  var body: some View {
+    Form {
+      CodexSettingsSection()
+      ClaudeCodeSettingsSection()
+    }
+    .formStyle(.grouped)
+  }
+}
+
+struct ClaudeCodeSettingsSection: View {
   @Environment(ProviderStore.self) private var store
-  @Environment(\.dismiss) private var dismiss
 
   var body: some View {
-    VStack(spacing: 0) {
-      Form {
-        Section {
-          LabeledContent(LocalizableKey.status.string) {
-            if let install = store.claudeCode {
-              Label(LocalizableKey.installedVersion.format(install.version), systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-            } else {
-              Label(LocalizableKey.notFound.string, systemImage: "xmark.circle").foregroundStyle(.secondary)
-            }
-          }
-          if let install = store.claudeCode {
-            LabeledContent(LocalizableKey.location.string) {
-              Text(install.executable.path).font(.caption.monospaced()).textSelection(.enabled)
-                .lineLimit(1).truncationMode(.middle)
-            }
-          }
-        } header: {
-          Text("Claude Code")
-        } footer: {
-          Text(LocalizableKey.claudeCodeSetup.string).font(.caption).foregroundStyle(.secondary)
+    Section {
+      LabeledContent(LocalizableKey.status.string) {
+        if store.detectingClaudeCode {
+          ProgressView().controlSize(.small)
+        } else if let install = store.claudeCode {
+          Label(LocalizableKey.installedVersion.format(install.version), systemImage: "checkmark.circle.fill")
+            .foregroundStyle(.green)
+        } else {
+          Label(LocalizableKey.notFound.string, systemImage: "xmark.circle").foregroundStyle(.secondary)
         }
       }
-      .formStyle(.grouped)
-      Divider()
-      HStack {
-        Button(LocalizableKey.detectAgain.string) {
-          Haptics.tap()
-          Task { await store.detectClaudeCode() }
-        }
-        .disabled(store.detectingClaudeCode)
-        Spacer()
-        Button(LocalizableKey.done.string) { dismiss() }.keyboardShortcut(.defaultAction)
-      }
-      .padding(12)
-    }
-    .frame(width: 480)
-    .frame(minHeight: 320, maxHeight: .infinity)
-    .overlay {
-      if store.detectingClaudeCode {
-        ZStack {
-          Rectangle().fill(.regularMaterial)
-          ProgressView(LocalizableKey.checking.string)
+      if let install = store.claudeCode {
+        LabeledContent(LocalizableKey.location.string) {
+          Text(install.executable.path).font(.caption.monospaced()).textSelection(.enabled)
+            .lineLimit(1).truncationMode(.middle)
         }
       }
+      Button(LocalizableKey.detectAgain.string) {
+        Haptics.tap()
+        Task { await store.detectClaudeCode() }
+      }
+      .disabled(store.detectingClaudeCode)
+    } header: {
+      Text("Claude Code")
+    } footer: {
+      Text(LocalizableKey.claudeCodeSetup.string).font(.caption).foregroundStyle(.secondary)
     }
   }
 }

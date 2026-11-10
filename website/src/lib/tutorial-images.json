@@ -1,0 +1,22 @@
+{
+  "hugging-face": {
+    "width": 1120,
+    "height": 880
+  },
+  "provider": {
+    "width": 960,
+    "height": 800
+  },
+  "flowcy": {
+    "width": 1160,
+    "height": 1040
+  },
+  "humanizer": {
+    "width": 1160,
+    "height": 1096
+  },
+  "refine-text": {
+    "width": 1160,
+    "height": 1040
+  }
+}

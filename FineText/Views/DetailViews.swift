@@ -116,7 +116,9 @@ struct RewriteDetailView: View {
             item.model = $0
             preferences.remember($0, for: .rewrite)
           }
-          LabeledContent(LocalizableKey.recordedCost.string) { CostLabel(summary: workspace.cost(for: item.id)) }
+          LabeledContent(workspace.providers.isFlowcy(item.model) ? LocalizableKey.flowcyUsage.string : LocalizableKey.recordedCost.string) {
+            GenerationUsageLabel(model: item.model, summary: workspace.cost(for: item.id))
+          }
           StatusLine(status: status)
           if let note = item.note {
             Label(note, systemImage: "info.circle").font(.caption).foregroundStyle(.secondary)
@@ -168,7 +170,9 @@ struct TranslationDetailView: View {
             item.model = $0
             preferences.remember($0, for: .translate)
           }
-          LabeledContent(LocalizableKey.recordedCost.string) { CostLabel(summary: workspace.cost(for: item.id)) }
+          LabeledContent(workspace.providers.isFlowcy(item.model) ? LocalizableKey.flowcyUsage.string : LocalizableKey.recordedCost.string) {
+            GenerationUsageLabel(model: item.model, summary: workspace.cost(for: item.id))
+          }
           StatusLine(status: status)
           OutputEditor(text: $item.output)
         }
