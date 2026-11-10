@@ -11,6 +11,9 @@ packages:
   RxAgentSDK:
     url: https://github.com/rxtech-lab/RxAgentSDK
     revision: 5f2eba0a2f55d1a4181f4a82a6046f3a8445310a
+  RxAuthSwift:
+    url: https://github.com/rxtech-lab/RxAuthSwift
+    from: 1.3.2
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     from: 2.10.1
@@ -59,6 +62,10 @@ targets:
       - package: ONNXRuntime
         product: onnxruntime
       - package: RxAgentSDK
+      - package: RxAuthSwift
+        product: RxAuthSwift
+      - package: RxAuthSwift
+        product: RxAuthSwiftUI
       - package: Sparkle
       - package: MLXSwiftLM
         product: MLXLLM
@@ -81,7 +88,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.rxlab.finetext
         PRODUCT_NAME: FineText
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: Configuration/FineText.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(FINETEXT_ENTITLEMENTS)
         ENABLE_HARDENED_RUNTIME: YES
         LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/../Frameworks
         OTHER_LDFLAGS: $(inherited) -ObjC
@@ -92,6 +99,13 @@ targets:
         LSUIElement: true
         SUFeedURL: https://update.finetext.rxlab.app/appcast.xml
         PresetsURL: $(PRESETS_URL)
+        FlowcyBaseURL: $(FLOWCY_BASE_URL)
+        FlowcyOAuthClientID: $(FLOWCY_OAUTH_CLIENT_ID)
+        FlowcyPasskeysEnabled: $(FLOWCY_PASSKEYS_ENABLED)
+        CFBundleURLTypes:
+          - CFBundleURLName: app.rxlab.finetext.oauth
+            CFBundleURLSchemes:
+              - finetext
         SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
         SUEnableInstallerLauncherService: true
         SUEnableAutomaticChecks: true

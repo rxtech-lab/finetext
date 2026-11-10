@@ -56,8 +56,12 @@ struct HomeView: View {
           .font(.headline)
         Spacer()
         Button { showCosts = true } label: {
-          Label(workspace.sessionCost(workspace.session.id).totalLabel, systemImage: "dollarsign.circle")
-            .font(.caption).monospacedDigit()
+          if workspace.providers.flowcy.isSignedIn {
+            FlowcyUsageLabel()
+          } else {
+            Label(workspace.sessionCost(workspace.session.id).totalLabel, systemImage: "dollarsign.circle")
+              .font(.caption).monospacedDigit()
+          }
         }.buttonStyle(.borderless).help(LocalizableKey.usageCosts.string)
         IconButton("clock.arrow.circlepath", help: LocalizableKey.history.string) { workspace.route = .history }
         IconButton("gearshape", help: LocalizableKey.settings.string) {
@@ -192,6 +196,7 @@ struct RewriteSection: View {
   @Environment(\.openSettings) private var openSettings
 
   @State private var showCustomPlatforms = false
+  @State private var pendingDelete: RewriteItem?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -209,14 +214,33 @@ struct RewriteSection: View {
           status: workspace.status(item.id),
           preview: item.plainOutput,
           cost: workspace.cost(for: item.id),
+          model: item.model,
           onRun: { workspace.run(item) },
           onStop: { workspace.stop(item.id) },
           onCopy: { workspace.copy(item.plainOutput) },
           onOpen: { workspace.route = .rewrite(item.id) }
         )
+        .contextMenu {
+          Button(LocalizableKey.delete.string, systemImage: "trash", role: .destructive) {
+            Haptics.tap()
+            pendingDelete = item
+          }
+        }
       }
     }
     .sheet(isPresented: $showCustomPlatforms) { CustomPlatformsSheet().onAppear { AppAnalytics.screen("custom_platforms") } }
+    .confirmationDialog(LocalizableKey.removeThisRewrite.string, isPresented: Binding(
+      get: { pendingDelete != nil },
+      set: { if !$0 { pendingDelete = nil } }
+    )) {
+      Button(LocalizableKey.delete.string, role: .destructive) {
+        if let pendingDelete {
+          workspace.remove(pendingDelete, id: pendingDelete.id)
+          Haptics.success()
+        }
+        pendingDelete = nil
+      }
+    }
   }
 
   private func menuEntries() -> [MenuEntry] {
@@ -317,6 +341,7 @@ struct TranslateSection: View {
           status: workspace.status(item.id),
           preview: item.output,
           cost: workspace.cost(for: item.id),
+          model: item.model,
           onRun: { workspace.run(item) },
           onStop: { workspace.stop(item.id) },
           onCopy: { workspace.copy(item.output) },
@@ -437,6 +462,7 @@ struct JobCard: View {
   let status: JobStatus
   let preview: String
   var cost: CostSummary
+  let model: ModelRef
   let onRun: () -> Void
   let onStop: () -> Void
   let onCopy: () -> Void
@@ -449,7 +475,7 @@ struct JobCard: View {
         VStack(alignment: .leading, spacing: 1) {
           Text(title).font(.subheadline.weight(.semibold)).lineLimit(1)
           Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-          CostLabel(summary: cost)
+          GenerationUsageLabel(model: model, summary: cost)
         }
         Spacer()
         if status.isRunning {
@@ -604,6 +630,26 @@ struct ModelMenuItems: View {
             Task { await providers.refreshCLIModels(provider.id) }
           })
         }
+        return items
+      })
+    }
+    if kind == .text && providers.flowcy.isSignedIn {
+      let flowcy = ProviderStore.flowcyProvider
+      entries.append(.submenu(flowcy.name) {
+        let models = providers.models(for: flowcy.id, kind: .text)
+        var items: [MenuEntry] = models.map { model in
+          let ref = ModelRef(providerID: flowcy.id, modelID: model.id)
+          return pick(providers.modelName(ref), ref)
+        }
+        if models.isEmpty {
+          items.append(.note(providers.flowcy.loadingModels ? LocalizableKey.loadingModels.string
+            : (providers.flowcy.modelError ?? LocalizableKey.flowcyNoModels.string)))
+        }
+        items.append(.separator)
+        items.append(.action(LocalizableKey.refreshModels.string, enabled: !providers.flowcy.loadingModels) {
+          Haptics.tap()
+          Task { await providers.flowcy.loadModels() }
+        })
         return items
       })
     }

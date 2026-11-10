@@ -10,6 +10,8 @@ import { repository } from "@/lib/release-data";
 import { LanguagePicker } from "@/components/language-picker";
 import { Icon } from "@/components/icon";
 import { ModelChips } from "@/components/model-chips";
+import { TutorialCards } from "@/components/tutorials";
+import { tutorialUI } from "@/lib/tutorials";
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
@@ -29,11 +31,12 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const t = messages[locale];
   await connection();
   const release = await getLatestRelease();
+  const tutorial = tutorialUI(locale);
   return <>
     <a href="#main" className="skip-link">{t.skip}</a>
     <header className="header wrap">
       <a href={`/${locale}`} className="brand"><Image src="/icon.svg" alt="" width={38} height={38} priority />FineText</a>
-      <nav aria-label="FineText"><a className="nav-feature" href="#features">{t.featuresLink}</a><LanguagePicker locale={locale} text={t} /></nav>
+      <nav aria-label="FineText"><a className="nav-feature" href="#features">{t.featuresLink}</a><a href={`/${locale}/tutorials`}>{tutorial.nav}</a><LanguagePicker locale={locale} text={t} /></nav>
     </header>
     <main id="main">
       <section className="hero wrap">
@@ -69,6 +72,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           <h3>{feature.title}</h3><p>{feature.body}</p>
         </article>)}</div>
       </section>
+      <section className="tutorial-section wrap" id="tutorials"><div className="tutorial-section-heading"><div><p className="eyebrow">{tutorial.label}</p><h2>{tutorial.section}</h2><p>{tutorial.sectionBody}</p></div><a className="text-link" href={`/${locale}/tutorials`}>{tutorial.all}<Icon kind="arrow" /></a></div><TutorialCards locale={locale} /></section>
       <section className="model-section wrap"><div className="model-inner"><div><p className="eyebrow">{t.modelLabel}</p><h2>{t.modelTitle}</h2><p className="model-body">{t.modelBody}</p><a href={repository} className="text-link">{t.github}<Icon kind="arrow"/></a></div><ModelChips labels={t.modelChips}/></div></section>
     </main>
     <footer className="footer wrap"><div><a href={`/${locale}`} className="brand"><Image src="/icon.svg" alt="" width={28} height={28}/>FineText</a><p>{t.footer}</p></div><div className="footer-links"><a href={repository}>{t.source}</a><span>© {new Date().getFullYear()} RxLab</span></div></footer>

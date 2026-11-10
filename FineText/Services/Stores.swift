@@ -61,6 +61,10 @@ enum Keychain {
   static let claudeCodeTextModel = RemoteModel(id: "claude-code-text", generatesImages: false, generatesText: true)
   static let claudeCodeTextRef = ModelRef(providerID: claudeCodeProvider.id, modelID: claudeCodeTextModel.id)
 
+  /// Flowcy cloud models, available after signing in with an rxlab account.
+  let flowcy = FlowcyAccount()
+  static let flowcyProvider = Provider(id: UUID(uuidString: "F10C0000-0000-4000-8000-00000000F10C")!, name: "Flowcy", baseURL: "")
+
   static let presets: [Provider] = [
     Provider(name: "OpenAI", baseURL: "https://api.openai.com/v1"),
     Provider(name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1"),
@@ -124,6 +128,7 @@ enum Keychain {
   }
 
   func modelName(_ ref: ModelRef) -> String {
+    if isFlowcy(ref) { return flowcy.alias(for: ref.modelID) ?? ref.modelID }
     if (isCodex(ref) || isClaudeCode(ref)) && CLIModels.explicitModel(ref.modelID) == nil {
       return LocalizableKey.cliDefaultModel.string
     }
@@ -134,9 +139,11 @@ enum Keychain {
 
   func isCodex(_ ref: ModelRef) -> Bool { ref.providerID == Self.codexProvider.id }
 
+  func isFlowcy(_ ref: ModelRef) -> Bool { ref.providerID == Self.flowcyProvider.id }
+
   /// True when at least one source can serve this kind of model (user providers, Codex, or local MLX models for text).
   func hasSources(for kind: ModelKind) -> Bool {
-    !providers.isEmpty || codex != nil || (kind == .text && (claudeCode != nil || !local.models.isEmpty))
+    !providers.isEmpty || codex != nil || (kind == .text && (claudeCode != nil || flowcy.isSignedIn || !local.models.isEmpty))
   }
 
   private func persist() {
@@ -148,6 +155,7 @@ enum Keychain {
   func provider(_ id: UUID) -> Provider? {
     if id == Self.codexProvider.id { return codex == nil ? nil : Self.codexProvider }
     if id == Self.claudeCodeProvider.id { return claudeCode == nil ? nil : Self.claudeCodeProvider }
+    if id == Self.flowcyProvider.id { return flowcy.isSignedIn ? Self.flowcyProvider : nil }
     return providers.first { $0.id == id }
   }
   func apiKey(for id: UUID) -> String { Keychain.get(account: id.uuidString) }
@@ -213,6 +221,10 @@ enum Keychain {
     if id == Self.claudeCodeProvider.id {
       return kind == .text && claudeCode != nil ? [Self.claudeCodeTextModel] + (models[id] ?? []) : []
     }
+    if id == Self.flowcyProvider.id {
+      guard kind == .text, flowcy.isSignedIn else { return [] }
+      return flowcy.models.map { RemoteModel(id: $0.modelId, generatesImages: false, generatesText: true) }
+    }
     if id == Provider.localID {
       return kind == .text ? local.models.map { RemoteModel(id: $0.id, generatesImages: false, generatesText: true) } : []
     }
@@ -224,6 +236,7 @@ enum Keychain {
       let provider = isCodex(ref) ? "Codex" : "Claude Code"
       return CLIModels.explicitModel(ref.modelID) == nil ? provider : "\(modelName(ref)) · \(provider)"
     }
+    if isFlowcy(ref) { return "\(modelName(ref)) · Flowcy" }
     let name = ref.modelID.split(separator: "/").last.map(String.init) ?? ref.modelID
     if ref.isLocal { return "\(name) · \(Provider.localName)" }
     guard providers.count > 1, let provider = provider(ref.providerID) else { return name }

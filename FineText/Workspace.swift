@@ -398,6 +398,12 @@ enum WorkTab: String, CaseIterable, Identifiable {
         onStatus: { [weak self] in self?.statuses[id] = .running($0) }, onUsage: usage, onDelta: onDelta
       )
     }
+    if providers.isFlowcy(model) {
+      statuses[id] = .running(status)
+      // The plan meters change after every request, including failed ones that held a reservation.
+      defer { Task { await providers.flowcy.loadUsage() } }
+      return try await providers.flowcy.streamChat(modelID: model.modelID, messages: messages, onDelta: onDelta)
+    }
     guard model.isLocal else {
       let client = try providers.client(for: model)
       statuses[id] = .running(status)

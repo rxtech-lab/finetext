@@ -21,6 +21,12 @@ The page fetches release information from `rxtech-lab/finetext` on every visit, 
 
 The preview is a localized HTML illustration, not an app screenshot. The icon is composed from the existing Icon Composer SVG layers.
 
+## Tutorials
+
+`/[locale]/tutorials` is the tutorial hub. Each guide has its own page, an accessible screenshot zoom dialog, and topic navigation through the sidebar. The language picker preserves the current guide. Tutorial copy lives in `src/lib/tutorials.ts`.
+
+All tutorial images are local WebP assets in `public/tutorials/`. The Hugging Face browser, local-model list, provider editor, and Humanizer were captured from the installed Mac app. Flowcy and the rewrite example are clearly labeled interface illustrations based on branch source; they do not claim a successful authenticated request. Regenerate those illustrations from `website/` with `node scripts/tutorials/generate-assets.mjs`. The branch build could not expose a usable app window during capture. Replace the illustrated assets with native captures when that build is available, and update their captions. Screenshots use English app controls in every locale.
+
 ## Checks
 
 ```sh
@@ -33,4 +39,4 @@ bun run test:e2e
 
 Alternatively, use an installed Chrome browser with `PLAYWRIGHT_CHANNEL=chrome bun run test:e2e`.
 
-Playwright launches a local dev server on port 3100. Tests cover locale negotiation, persistence, translated content, the language dialog, responsive layout, and both download/fallback behavior. Unit tests cover release selection and language matching.
+Playwright launches a local dev server on port 3100. Set `PLAYWRIGHT_PORT=3000` to reuse an existing server on port 3000. Tutorial tests cover all 20 localized guide pages, WebP loading, mobile overflow, guide navigation, image dialog focus/Escape, and language switching within a guide. Tests cover locale negotiation, persistence, translated content, the language dialog, responsive layout, and both download/fallback behavior. Unit tests cover release selection and language matching.

@@ -10,7 +10,8 @@ export function LanguagePicker({ locale, text }: { locale: Locale; text: Message
   function choose(value: Locale) {
     document.cookie = `${localeCookie}=${value}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
     setOpen(false);
-    router.push(`/${value}${location.search}${location.hash}`);
+    const path = location.pathname.split("/").slice(2).join("/");
+    router.push(`/${value}${path ? `/${path}` : ""}${location.search}${location.hash}`);
   }
   return <>
     <Button color="inherit" onClick={() => setOpen(true)} aria-label={text.chooseLanguage} className="language-button">
