@@ -96,22 +96,25 @@ struct RewriteDetailView: View {
         }
         Divider()
         VStack(alignment: .leading, spacing: 10) {
-          Picker(LocalizableKey.tone.string, selection: $item.tone) {
-            ForEach(Tone.allCases) { Text($0.title).tag($0) }
-          }
-          .onChange(of: item.tone) { _, tone in preferences.setTone(tone, for: item) }
-          Picker(LocalizableKey.targetLanguage.string, selection: $item.targetLanguageCode) {
-            Text(LocalizableKey.sameAsOriginal.string).tag(String?.none)
-            ForEach(Language.all) { language in
-              Text(language.localizedName).tag(Optional(language.code))
+          // Proofreading keeps the author's tone and language, so those choices only apply to rewrites.
+          if !item.isGrammar {
+            Picker(LocalizableKey.tone.string, selection: $item.tone) {
+              ForEach(Tone.allCases) { Text($0.title).tag($0) }
             }
+            .onChange(of: item.tone) { _, tone in preferences.setTone(tone, for: item) }
+            Picker(LocalizableKey.targetLanguage.string, selection: $item.targetLanguageCode) {
+              Text(LocalizableKey.sameAsOriginal.string).tag(String?.none)
+              ForEach(Language.all) { language in
+                Text(language.localizedName).tag(Optional(language.code))
+              }
+            }
+            .onChange(of: item.targetLanguageCode) { _, _ in
+              preferences.remember(rewriteLanguage: item.targetLanguage)
+              workspace.save()
+              Haptics.tap()
+            }
+            .disabled(status.isRunning)
           }
-          .onChange(of: item.targetLanguageCode) { _, _ in
-            preferences.remember(rewriteLanguage: item.targetLanguage)
-            workspace.save()
-            Haptics.tap()
-          }
-          .disabled(status.isRunning)
           ModelPickerMenu(kind: .text, purpose: .rewrite, current: item.model) {
             item.model = $0
             preferences.remember($0, for: .rewrite)
@@ -126,7 +129,7 @@ struct RewriteDetailView: View {
           RefinementResultView(
             original: item.refinementSource ?? workspace.originalText,
             output: $item.output, status: status, limit: item.characterLimit, assessment: item,
-            preview: workspace.refinementPreviews[id], fields: item.fields
+            preview: workspace.refinementPreviews[id], fields: item.fields, grammar: item.isGrammar
           )
         }
         .padding(14)

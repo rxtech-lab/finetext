@@ -28,6 +28,7 @@ id: emailSend                # stable and unique; history and per-preset tones u
 title: { en: "Send", zh-TW: "寄送" }   # text, or locale → text with "en" required
 promptTitle: Email Send      # English name used in prompts (default: title.en)
 symbol: envelope
+kind: rewrite                # rewrite (default) or grammar, see below
 tone: professional           # default tone: natural, professional, casual, witty, friendly,
                              # enthusiastic, informative, storytelling, bold, concise, empathetic
 characterLimit: 280          # optional soft limit shown in the editor
@@ -46,6 +47,12 @@ fields:                      # optional structured output, one text box with its
 The app shows a preset as the menu path joined with `·`, such as `Email · Send`.
 
 With `fields`, the app tells the model to wrap each field in an XML tag (`<subject>…</subject>`). Each field then gets its own text box and copy button. Don't describe the layout (such as "start with a Subject: line") in the guidelines.
+
+## Grammar presets
+
+With `kind: grammar`, the app proofreads instead of rewriting. It asks the model to mark every correction inline and shows each one as the original word in red with a strike-through, then the replacement. Hovering a correction shows the explanation and alternative replacements, and the corrections can be hidden to read the clean text. Copying always copies the corrected text. Grammar presets skip humanization and can't have `fields`. The body holds the proofreading rules; the app adds the markup format itself.
+
+Older apps that don't know `kind` treat a grammar preset as a normal rewrite with the same guidelines.
 
 ## Templates
 

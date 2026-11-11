@@ -513,3 +513,16 @@
 "refreshUsage" = "Refresh Usage";
 "openInChrome" = "Open in Chrome";
 "openInBrowser" = "Open in Browser";
+"checkingGrammar" = "Checking grammar…";
+"correctedText" = "Corrected";
+"showCorrections" = "Show Corrections";
+"hideCorrections" = "Hide Corrections";
+"grammarCorrectionCount" = "Corrections: %d";
+"noGrammarIssues" = "No issues found";
+"grammarLegend" = "Original text: red with a strike-through. Correction: green. Hover a correction to see the error and other options.";
+"grammarCorrection" = "Correction";
+"grammarAlternatives" = "Alternatives";
+"useAlternative" = "Use “%@”";
+"keepOriginal" = "Keep Original";
+"grammarRemoved" = "Remove “%@”";
+"grammarInserted" = "Add “%@”";

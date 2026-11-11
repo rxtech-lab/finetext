@@ -492,6 +492,19 @@ enum LocalizableKey: String, CaseIterable, Sendable {
   case refreshUsage
   case openInChrome
   case openInBrowser
+  case checkingGrammar
+  case correctedText
+  case showCorrections
+  case hideCorrections
+  case grammarCorrectionCount
+  case noGrammarIssues
+  case grammarLegend
+  case grammarCorrection
+  case grammarAlternatives
+  case useAlternative
+  case keepOriginal
+  case grammarRemoved
+  case grammarInserted
 
   var string: String {
     Bundle.main.localizedString(forKey: rawValue, value: nil, table: "Localizable")

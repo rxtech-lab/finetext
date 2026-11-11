@@ -50,18 +50,30 @@ struct PresetField: Codable, Hashable, Sendable, Identifiable {
   }
 }
 
+/// What the app does with a preset. Unknown kinds from newer catalogs fall back to a rewrite.
+enum PresetKind: String, Codable, Sendable {
+  case rewrite
+  /// Proofread only: the model marks each correction inline (see `GrammarMarkup`).
+  case grammar
+
+  init(_ raw: String?) { self = raw.flatMap(PresetKind.init(rawValue:)) ?? .rewrite }
+}
+
 /// A rewrite preset from the cloud catalog. `template` holds the platform guidelines.
 struct Preset: Codable, Hashable, Sendable, Identifiable {
   let id: String
   let title: LocalizedText
   let promptTitle: String
   var symbol: String?
+  /// Raw kind, kept as text so a newer catalog's kinds never fail decoding.
+  var kind: String?
   var tone: String?
   var characterLimit: Int?
   var fields: [PresetField]?
   let template: String
 
   var defaultTone: Tone { tone.flatMap(Tone.init(rawValue:)) ?? .natural }
+  var presetKind: PresetKind { PresetKind(kind) }
 }
 
 struct PresetMenu: Codable, Hashable, Sendable, Identifiable {
@@ -161,6 +173,7 @@ struct PresetSnapshot: Codable, Hashable, Sendable {
   var path: [LocalizedText]
   var promptTitle: String
   var symbol: String?
+  var kind: String?
   var tone: String?
   var characterLimit: Int?
   var fields: [PresetField]?
@@ -171,6 +184,7 @@ struct PresetSnapshot: Codable, Hashable, Sendable {
     path = entry.path
     promptTitle = entry.preset.promptTitle
     symbol = entry.preset.symbol
+    kind = entry.preset.kind
     tone = entry.preset.tone
     characterLimit = entry.preset.characterLimit
     fields = entry.preset.fields
@@ -179,6 +193,7 @@ struct PresetSnapshot: Codable, Hashable, Sendable {
 
   var title: String { path.map(\.localized).joined(separator: " · ") }
   var defaultTone: Tone { tone.flatMap(Tone.init(rawValue:)) ?? .natural }
+  var presetKind: PresetKind { PresetKind(kind) }
 
   /// Platform guidelines with the template filled in. A broken template falls back to its raw text.
   func guidelines(tone: Tone, appLanguage: String = Bundle.main.preferredLocalizations.first ?? "en") -> String {

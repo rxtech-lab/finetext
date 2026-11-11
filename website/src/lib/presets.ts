@@ -13,6 +13,8 @@ export const TONES = [
   "natural", "professional", "casual", "witty", "friendly", "enthusiastic",
   "informative", "storytelling", "bold", "concise", "empathetic",
 ] as const;
+/** What the app does with a preset: rewrite the text, or proofread it and mark each correction inline. */
+export const PRESET_KINDS = ["rewrite", "grammar"] as const;
 /** Variables the app supplies when rendering a preset template. */
 export const TEMPLATE_VARIABLES = [
   "tone", "tone_id", "tone_guidance", "character_limit",
@@ -24,6 +26,7 @@ export type PresetField = { id: string; label: LocalizedText; multiline: boolean
 export type PresetMenu = { type: "menu"; id: string; title: LocalizedText; symbol?: string; children: PresetNode[] };
 export type Preset = {
   type: "preset"; id: string; title: LocalizedText; promptTitle: string; symbol?: string;
+  kind?: Exclude<(typeof PRESET_KINDS)[number], "rewrite">;
   tone?: (typeof TONES)[number]; characterLimit?: number; fields?: PresetField[]; template: string;
 };
 export type PresetNode = PresetMenu | Preset;
@@ -77,6 +80,9 @@ function readPreset(file: string): { node: Preset; order: number } {
   const title = localized(data.title, `${file}: title`);
   const tone = data.tone;
   if (tone !== undefined && !(TONES as readonly unknown[]).includes(tone)) throw new PresetError(`${file}: unknown tone "${tone}"`);
+  const kind = data.kind ?? "rewrite";
+  if (!(PRESET_KINDS as readonly unknown[]).includes(kind)) throw new PresetError(`${file}: unknown kind "${kind}"`);
+  if (kind === "grammar" && data.fields !== undefined) throw new PresetError(`${file}: grammar presets cannot have fields`);
   const template = body.trim() + "\n";
   try {
     parseTemplate(template);
@@ -104,6 +110,8 @@ function readPreset(file: string): { node: Preset; order: number } {
   const node: Preset = { type: "preset", id, title, promptTitle: optionalString(data.promptTitle, `${file}: promptTitle`) ?? title.en, template };
   const symbol = optionalString(data.symbol, `${file}: symbol`);
   if (symbol) node.symbol = symbol;
+  // Only non-default kinds are written, so rewrite presets keep their existing catalog shape.
+  if (kind !== "rewrite") node.kind = kind as Preset["kind"];
   if (tone) node.tone = tone as Preset["tone"];
   const limit = optionalLimit(data.characterLimit, `${file}: characterLimit`);
   if (limit) node.characterLimit = limit;

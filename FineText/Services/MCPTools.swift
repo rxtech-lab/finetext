@@ -320,6 +320,11 @@ import Foundation
       "cost_usd": workspace.cost(for: id).knownTotal ?? NSNull(),
     ]
     if let fields, let values = StructuredOutput.parse(item.output, fields: fields) { result["fields"] = values }
+    if item.isGrammar {
+      result["corrections"] = GrammarMarkup.fixes(in: item.output).map { fix in
+        ["original": fix.original, "replacement": fix.replacement, "reason": fix.reason, "alternatives": fix.alternatives] as [String: Any]
+      }
+    }
     if preserve { result["missing_placeholders"] = TemplatePlaceholders.missing(from: item.output, original: text) }
     return result
   }
