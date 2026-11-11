@@ -81,9 +81,11 @@ import SwiftData
   var isCustomPlatform: Bool { customPlatformID != nil }
   var platformTitle: String { customPlatformName ?? preset?.title ?? platformRaw }
   var platformSymbol: String { isCustomPlatform ? "slider.horizontal.3" : preset?.symbol ?? "text.bubble" }
-  var fields: [PresetField]? { isCustomPlatform ? nil : preset?.fields }
-  /// Readable output: structured fields become labelled text.
-  var plainOutput: String { StructuredOutput.plainText(output, fields: fields) }
+  var fields: [PresetField]? { isCustomPlatform || isGrammar ? nil : preset?.fields }
+  /// Grammar presets proofread the original and mark corrections inline instead of rewriting it.
+  var isGrammar: Bool { !isCustomPlatform && preset?.presetKind == .grammar }
+  /// Readable output: structured fields become labelled text and grammar markup becomes the corrected text.
+  var plainOutput: String { isGrammar ? GrammarMarkup.plainText(output) : StructuredOutput.plainText(output, fields: fields) }
   var characterLimit: Int? { isCustomPlatform ? nil : preset?.characterLimit }
   var defaultTone: Tone { isCustomPlatform ? .natural : preset?.defaultTone ?? .natural }
 

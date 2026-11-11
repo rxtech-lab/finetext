@@ -513,3 +513,16 @@
 "refreshUsage" = "重新整理用量";
 "openInChrome" = "在 Chrome 中開啟";
 "openInBrowser" = "在瀏覽器中開啟";
+"checkingGrammar" = "正在檢查文法…";
+"correctedText" = "已更正";
+"showCorrections" = "顯示更正";
+"hideCorrections" = "隱藏更正";
+"grammarCorrectionCount" = "更正：%d";
+"noGrammarIssues" = "未發現問題";
+"grammarLegend" = "原文：紅色並加上刪除線。更正：綠色。將指標停留在更正上可查看錯誤和其他選項。";
+"grammarCorrection" = "更正";
+"grammarAlternatives" = "其他選項";
+"useAlternative" = "使用「%@」";
+"keepOriginal" = "保留原文";
+"grammarRemoved" = "刪除「%@」";
+"grammarInserted" = "加入「%@」";

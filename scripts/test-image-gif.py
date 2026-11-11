@@ -10,6 +10,7 @@ with tempfile.TemporaryDirectory(prefix='finetext-gif-') as temporary:
                'FineText/Persistence.swift', 'FineText/Services/OpenAIClient.swift',
                'FineText/Services/Codex.swift', 'FineText/Services/GenerationUsage.swift',
                'FineText/Services/PresetTemplate.swift', 'FineText/Services/Presets.swift',
+               'FineText/Services/GrammarMarkup.swift',
                'scripts/tests/ImageGIFTests.swift']
     subprocess.run(['swiftc', '-swift-version', '6', '-strict-concurrency=complete',
                     '-module-cache-path', str(Path(temporary) / 'module-cache'),

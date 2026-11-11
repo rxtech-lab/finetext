@@ -70,6 +70,15 @@ describe("preset catalog", () => {
     ]);
   });
 
+  test("parses the grammar kind and omits the default", () => {
+    const items = buildPresetCatalog(fixture({
+      "fix.md": preset("fix", "kind: grammar\norder: 1\n"),
+      "post.md": preset("post", "kind: rewrite\norder: 2\n"),
+    })).items as [Preset, Preset];
+    assert.equal(items[0].kind, "grammar");
+    assert.equal("kind" in items[1], false);
+  });
+
   const invalid: [string, Record<string, string>][] = [
     ["duplicate ids", { "a.md": preset("same"), "b/c.md": preset("same") }],
     ["unknown variables", { "a.md": preset("a", "", "{{ tonne }}") }],
@@ -78,6 +87,8 @@ describe("preset catalog", () => {
     ["missing id", { "a.md": "---\ntitle: A\n---\nx" }],
     ["missing English title", { "a.md": "---\nid: a\ntitle:\n  zh-TW: 甲\n---\nx" }],
     ["bad field id", { "a.md": preset("a", "fields:\n  - id: Bad Field\n    label: X\n") }],
+    ["unknown kind", { "a.md": preset("a", "kind: poetry\n") }],
+    ["grammar with fields", { "a.md": preset("a", "kind: grammar\nfields:\n  - id: body\n    label: Body\n") }],
     ["no presets", { "README.md": "x" }],
   ];
   for (const [name, files] of invalid) {
@@ -91,7 +102,7 @@ describe("preset catalog", () => {
     const visit = (nodes: PresetNode[]) => nodes.forEach((node) => (node.type === "menu" ? visit(node.children) : ids.push(node.id)));
     visit(buildPresetCatalog().items);
     assert.deepEqual(ids.sort(), [
-      "blog", "emailReply", "emailSend", "linkedin", "linkedinChat", "linkedinComment", "message",
+      "blog", "emailReply", "emailSend", "grammar", "linkedin", "linkedinChat", "linkedinComment", "message",
       "productHunt", "productHuntComment", "productHuntDescription", "productHuntMakerComment", "productHuntReply",
       "productHuntTagline", "reddit", "redditComment", "x", "xReply", "xThread",
       "youtubeComment", "youtubeDescription", "youtubeTitle",

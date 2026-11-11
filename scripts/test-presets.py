@@ -11,7 +11,7 @@ with tempfile.TemporaryDirectory(prefix='finetext-presets-') as temporary:
     sources = [
         'FineText/Localization/LocalizableKey.swift', 'FineText/Models.swift', 'FineText/Persistence.swift',
         'FineText/Services/OpenAIClient.swift', 'FineText/Services/GenerationUsage.swift',
-        'FineText/Services/PresetTemplate.swift', 'FineText/Services/Presets.swift',
+        'FineText/Services/PresetTemplate.swift', 'FineText/Services/Presets.swift', 'FineText/Services/GrammarMarkup.swift',
         'scripts/tests/PresetTests.swift',
     ]
     subprocess.run([

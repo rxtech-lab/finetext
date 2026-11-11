@@ -49,6 +49,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     let bundled = root.appending(path: "FineText/Resources/presets.json")
     try bundledCatalog(bundled)
     structuredOutput()
+    grammarMarkup(catalog: bundled)
     customPlatformTree()
     try rewriteLanguage(scratch: scratch)
     try await store(bundled: bundled, scratch: scratch)
@@ -98,7 +99,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
   static func bundledCatalog(_ url: URL) throws {
     let catalog = try PresetCatalog.decode(try Data(contentsOf: url))
     let entries = catalog.entries
-    check(entries.count == 21, "expected 21 migrated presets, got \(entries.count)")
+    check(entries.count == 22, "expected 22 presets, got \(entries.count)")
     check(Set(entries.map(\.id)).count == entries.count, "duplicate preset ids")
     for id in ["x", "xReply", "emailSend", "reddit", "blog", "message", "productHuntMakerComment"] {
       check(catalog.entries.contains { $0.id == id }, "missing legacy id \(id)")
@@ -133,6 +134,47 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     check((try? PresetCatalog.decode(Data(#"{"schemaVersion":99,"version":"v","items":[]}"#.utf8))) == nil, "newer schema rejected")
     check((try? PresetCatalog.decode(Data(#"{"schemaVersion":1,"version":"v","items":[]}"#.utf8))) == nil, "empty rejected")
     print("Bundled catalog: \(entries.count) presets render; legacy ids, fields and nesting verified.")
+  }
+
+  @MainActor static func grammarMarkup(catalog url: URL) {
+    let catalog = try! PresetCatalog.decode(try! Data(contentsOf: url))
+    let entry = catalog.entries.first { $0.id == "grammar" }!
+    check(entry.preset.presetKind == .grammar, "grammar preset kind")
+    check(catalog.entries.first { $0.id == "x" }!.preset.presetKind == .rewrite, "presets default to rewrite")
+    check(PresetKind("future") == .rewrite, "unknown kinds fall back to rewrite")
+
+    let model = #"I <fix><from>has</from><to>have</to><why>Agreement.</why><alt>had</alt></fix> two <fix><from>cat</from><to>cats</to><why>Plural.</why></fix>."#
+    check(GrammarMarkup.plainText(model) == "I have two cats.", "corrected text: \(GrammarMarkup.plainText(model))")
+    let fixes = GrammarMarkup.fixes(in: model)
+    check(fixes.count == 2 && fixes[0] == GrammarFix(original: "has", replacement: "have", reason: "Agreement.", alternatives: ["had"]), "fixes \(fixes)")
+    check(GrammarMarkup.compose(GrammarMarkup.parse(model)) == model, "compose round-trips")
+
+    let chosen = GrammarMarkup.choose("had", at: 1, in: model)
+    check(GrammarMarkup.plainText(chosen) == "I had two cats.", "alternative applied")
+    check(GrammarMarkup.fixes(in: chosen)[0].alternatives == ["have"], "previous correction becomes an alternative")
+    let kept = GrammarMarkup.keepOriginal(at: 3, in: model)
+    check(GrammarMarkup.plainText(kept) == "I have two cat." && GrammarMarkup.fixes(in: kept).count == 1, "keep original")
+
+    // Streaming: half-written tags never leak, the original shows until the correction arrives.
+    check(GrammarMarkup.plainText("I <fi") == "I ", "partial opening tag hidden")
+    check(GrammarMarkup.plainText("I <fix><from>has</from><to>ha") == "I has", "original until correction completes")
+    check(GrammarMarkup.plainText("I <fix><from>has</from><to>have</to><why>Agr") == "I has", "original until </fix>")
+    check(GrammarMarkup.plainText("I <fix><from>ha") == "I ha", "partial original streams")
+    check(GrammarMarkup.plainText("I <fix><from>has</fr") == "I has", "partial closing tag hidden")
+    check(GrammarMarkup.unchecked(original: "I has two cat.", markup: "I <fix><from>has</from><to>have</to></fix> tw") == "o cat.", "unchecked remainder")
+    check(GrammarMarkup.unchecked(original: "I has two cat.", markup: "We ") == nil, "drifted stream has no remainder")
+    check(GrammarMarkup.plainText("Tom & Jerry < 3") == "Tom & Jerry < 3", "plain text untouched")
+    check(GrammarMarkup.parse("a <fix><from>x</from><to>x</to></fix> b") == [.text("a x b")], "no-op fixes merge into text")
+    check(GrammarMarkup.plainText("a<fix><from></from><to>n</to><why>Insert.</why></fix> apple") == "an apple", "insertion")
+
+    let item = RewriteItem(presetID: "grammar", tone: .natural, model: ModelRef(providerID: UUID(), modelID: "m"))
+    item.preset = PresetSnapshot(entry)
+    item.output = model
+    check(item.isGrammar && item.fields == nil && item.plainOutput == "I have two cats.", "rewrite item copies corrected text")
+    let instruction = GrammarMarkup.formatInstruction(explanationLanguage: "Chinese (Taiwan)")
+    check(instruction.contains("<fix><from>") && instruction.contains("Chinese (Taiwan)"), "format instruction")
+    check(GrammarMarkup.plainText(instruction.components(separatedBy: "becomes:\n").last!) == "I have two cats.", "instruction example is valid markup")
+    print("Grammar markup: parsing, streaming, alternatives and format instruction verified.")
   }
 
   static func structuredOutput() {
@@ -192,7 +234,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     check(offline.catalog.version == bundledVersion, "bundled fallback")
     let r1 = await offline.refresh()
     check(r1 == false && offline.lastError != nil, "offline refresh fails softly")
-    check(offline.entries.count == 21, "offline keeps presets")
+    check(offline.entries.count == 22, "offline keeps presets")
 
     // A new catalog downloads, replaces the menu and is cached for later launches.
     let fresh = """
