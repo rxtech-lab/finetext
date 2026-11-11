@@ -6,7 +6,7 @@ import SwiftUI
 struct LocalModelsSettingsView: View {
   @Environment(LocalModelStore.self) private var store
   @State private var selection: String?
-  @State private var browsing = false
+  @State private var navigation = AppNavigation.shared
   @State private var pendingRemove: LocalModel?
   @State private var toast: Toast?
 
@@ -18,7 +18,7 @@ struct LocalModelsSettingsView: View {
         } description: {
           Text(LocalizableKey.downloadLocalExplanation.string)
         } actions: {
-          Button(LocalizableKey.browseHuggingFace.string) { browsing = true }.buttonStyle(.borderedProminent)
+          Button(LocalizableKey.browseHuggingFace.string) { navigation.browseHuggingFace = true }.buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
       } else {
@@ -47,7 +47,7 @@ struct LocalModelsSettingsView: View {
       }
       Divider()
       HStack(spacing: 6) {
-        Button { browsing = true } label: { Image(systemName: "plus") }
+        Button { navigation.browseHuggingFace = true } label: { Image(systemName: "plus") }
           .help(LocalizableKey.browseHuggingFaceHelp.string)
         Button {
           pendingRemove = selection.flatMap(store.model)
@@ -58,14 +58,14 @@ struct LocalModelsSettingsView: View {
         Text(LocalizableKey.pickLocalModels.format(Provider.localName))
           .font(.caption).foregroundStyle(.secondary)
         Spacer()
-        Button(LocalizableKey.browseHuggingFace.string) { browsing = true }
+        Button(LocalizableKey.browseHuggingFace.string) { navigation.browseHuggingFace = true }
       }
       .buttonStyle(.borderless)
       .padding(8)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .overlay(alignment: .bottom) { SettingsToast(toast: toast) }
-    .sheet(isPresented: $browsing) { HubBrowserSheet() }
+    .sheet(isPresented: $navigation.browseHuggingFace) { HubBrowserSheet() }
     .confirmationDialog(
       LocalizableKey.removeNamedModel.format(pendingRemove?.name ?? LocalizableKey.model.string),
       isPresented: Binding(get: { pendingRemove != nil }, set: { if !$0 { pendingRemove = nil } })

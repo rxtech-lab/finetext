@@ -1,9 +1,5 @@
 import SwiftUI
 
-enum SettingsTab: String {
-  case general, platforms, providers, agents, flowcy, local, humanizer, mcp
-}
-
 struct SettingsView: View {
   @AppStorage(DefaultsKey.settingsTab) private var tab = SettingsTab.general
 

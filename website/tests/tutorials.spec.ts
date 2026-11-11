@@ -41,6 +41,18 @@ test("renders all tutorial locales on mobile with working assets and no overflow
       await page.goto(`/${locale}/tutorials/${slug}`);
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
       await expect(page.locator(".tutorial-steps li")).toHaveCount(3);
+      const destinations: Record<string, string> = {
+        "hugging-face": "finetext://settings/local/hugging-face",
+        "openai-compatible": "finetext://settings/providers",
+        flowcy: "finetext://settings/flowcy",
+        humanizer: "finetext://settings/humanizer",
+        "refine-text": "finetext://rewrite",
+      };
+      await expect(page.locator(".tutorial-steps p a.tutorial-open-link")).toHaveAttribute("href", destinations[slug]);
+      await expect(page.locator(".tutorial-steps p a.tutorial-open-link")).toBeVisible();
+      await expect(page.locator(".tutorial-title a[href^='finetext:']")).toHaveCount(0);
+      const linkedStep = slug === "flowcy" ? 1 : 0;
+      await expect(page.locator(".tutorial-steps li").nth(linkedStep).locator("a")).toHaveAttribute("href", destinations[slug]);
       const image = page.locator(".tutorial-image-button img");
       await expect(image).toHaveJSProperty("complete", true);
       expect(await image.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
