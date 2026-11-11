@@ -4,6 +4,7 @@ import SwiftData
 import SwiftUI
 
 @main struct FineTextApp: App {
+  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
   @State private var providers: ProviderStore
   @State private var preferences: Preferences
   @State private var presets: PresetStore
@@ -42,9 +43,21 @@ import SwiftUI
         .environment(updater)
         .modelContainer(container)
     } label: {
-      Image(systemName: "wand.and.sparkles")
+      DeepLinkMenuLabel(workspace: workspace)
     }
     .menuBarExtraStyle(.window)
+
+    Window("FineText", id: "workspace") {
+      MenuContentView()
+        .environment(workspace)
+        .environment(providers)
+        .environment(preferences)
+        .environment(presets)
+        .environment(updater)
+        .modelContainer(container)
+    }
+    .windowResizability(.contentSize)
+    .defaultLaunchBehavior(.suppressed)
 
     Settings {
       SettingsView()
