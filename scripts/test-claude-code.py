@@ -30,6 +30,7 @@ let package = Package(name: "AdapterTests", platforms: [.macOS(.v26)],
                      'FineText/Localization/LocalizableKey.swift', 'FineText/Models.swift',
                      'FineText/Persistence.swift', 'FineText/Services/OpenAIClient.swift',
                      'FineText/Services/PresetTemplate.swift', 'FineText/Services/Presets.swift',
+                     'FineText/Services/GrammarMarkup.swift',
                      'scripts/tests/ClaudeCodeSessionTests.swift']:
         shutil.copy(root / relative, source)
     subprocess.run(['swift', 'run', '--package-path', str(package), 'AdapterTests'], check=True, timeout=300)

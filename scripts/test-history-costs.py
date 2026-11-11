@@ -12,6 +12,7 @@ with tempfile.TemporaryDirectory(prefix='finetext-history-costs-') as temporary:
         'FineText/Persistence.swift', 'FineText/Services/HistoryStore.swift',
         'FineText/Services/OpenAIClient.swift', 'FineText/Services/GenerationUsage.swift',
         'FineText/Services/PresetTemplate.swift', 'FineText/Services/Presets.swift',
+        'FineText/Services/GrammarMarkup.swift',
         'scripts/tests/HistoryCostsTests.swift',
     ]
     subprocess.run([
