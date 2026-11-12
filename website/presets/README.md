@@ -31,6 +31,8 @@ symbol: envelope
 kind: rewrite                # rewrite (default) or grammar, see below
 tone: professional           # default tone: natural, professional, casual, witty, friendly,
                              # enthusiastic, informative, storytelling, bold, concise, empathetic
+targetLanguage: en          # optional default output language (BCP-47)
+allowedTargetLanguages: [en, zh-HK]  # optional exclusive choices; no "Same as original"
 characterLimit: 280          # optional soft limit shown in the editor
 order: 10
 fields:                      # optional structured output, one text box with its own copy button per field
@@ -43,6 +45,8 @@ fields:                      # optional structured output, one text box with its
 ---
 - Guidelines for the model…
 ```
+
+A preset’s `targetLanguage` takes precedence over the last-used language when adding a rewrite. With `allowedTargetLanguages`, only those languages can be selected; an invalid saved selection falls back to `targetLanguage`, or the first allowed language. Omit both fields to keep the usual language choices. Cantonese uses `targetLanguage: zh-HK` and `allowedTargetLanguages: [zh-HK]`.
 
 The app shows a preset as the menu path joined with `·`, such as `Email · Send`.
 

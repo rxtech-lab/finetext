@@ -159,8 +159,8 @@ enum WorkTab: String, CaseIterable, Identifiable {
     preferences.remember(preset: entry.preset)
     preferences.remember(model, for: .rewrite)
     let item = RewriteItem(presetID: entry.preset.id, tone: preferences.tone(for: entry.preset), model: model)
-    item.targetLanguage = preferences.lastRewriteLanguage
     item.preset = PresetSnapshot(entry)
+    item.targetLanguage = entry.preset.targetLanguage.map(Language.named(code:)) ?? preferences.lastRewriteLanguage
     session.rewrites.append(item)
     AppAnalytics.log(.itemAdded, rewriteParameters(item))
     touch()

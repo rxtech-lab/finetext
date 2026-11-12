@@ -27,6 +27,7 @@ export type PresetMenu = { type: "menu"; id: string; title: LocalizedText; symbo
 export type Preset = {
   type: "preset"; id: string; title: LocalizedText; promptTitle: string; symbol?: string;
   kind?: Exclude<(typeof PRESET_KINDS)[number], "rewrite">;
+  targetLanguage?: string; allowedTargetLanguages?: string[];
   tone?: (typeof TONES)[number]; characterLimit?: number; fields?: PresetField[]; template: string;
 };
 export type PresetNode = PresetMenu | Preset;
@@ -83,6 +84,24 @@ function readPreset(file: string): { node: Preset; order: number } {
   const kind = data.kind ?? "rewrite";
   if (!(PRESET_KINDS as readonly unknown[]).includes(kind)) throw new PresetError(`${file}: unknown kind "${kind}"`);
   if (kind === "grammar" && data.fields !== undefined) throw new PresetError(`${file}: grammar presets cannot have fields`);
+  const languageCode = (value: unknown, where: string): string => {
+    const code = optionalString(value, where);
+    if (!code) throw new PresetError(`${where} must be a BCP-47 language code`);
+    try {
+      if (Intl.getCanonicalLocales(code)[0] !== code) throw new Error();
+    } catch { throw new PresetError(`${where} must be a canonical BCP-47 language code`); }
+    return code;
+  };
+  const targetLanguage = data.targetLanguage === undefined ? undefined : languageCode(data.targetLanguage, `${file}: targetLanguage`);
+  let allowedTargetLanguages: string[] | undefined;
+  if (data.allowedTargetLanguages !== undefined) {
+    if (!Array.isArray(data.allowedTargetLanguages) || !data.allowedTargetLanguages.length) {
+      throw new PresetError(`${file}: allowedTargetLanguages must be a non-empty list`);
+    }
+    allowedTargetLanguages = data.allowedTargetLanguages.map((code) => languageCode(code, `${file}: allowedTargetLanguages`));
+    if (new Set(allowedTargetLanguages).size !== allowedTargetLanguages.length) throw new PresetError(`${file}: duplicate language codes`);
+    if (targetLanguage && !allowedTargetLanguages.includes(targetLanguage)) throw new PresetError(`${file}: targetLanguage must be allowed`);
+  }
   const template = body.trim() + "\n";
   try {
     parseTemplate(template);
@@ -116,6 +135,8 @@ function readPreset(file: string): { node: Preset; order: number } {
   const limit = optionalLimit(data.characterLimit, `${file}: characterLimit`);
   if (limit) node.characterLimit = limit;
   if (fields) node.fields = fields;
+  if (targetLanguage) node.targetLanguage = targetLanguage;
+  if (allowedTargetLanguages) node.allowedTargetLanguages = allowedTargetLanguages;
   return { node, order: order(data) };
 }
 

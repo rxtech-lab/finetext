@@ -8,6 +8,8 @@ title:
 promptTitle: Cantonese Rewrite
 symbol: character.bubble
 tone: natural
+targetLanguage: zh-HK
+allowedTargetLanguages: [zh-HK]
 order: 85
 ---
 - Rewrite the source text in natural, idiomatic Hong Kong Cantonese, even when the source is in another language. Use Traditional Chinese characters by default.

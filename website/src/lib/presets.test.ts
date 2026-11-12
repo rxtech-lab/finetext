@@ -79,7 +79,23 @@ describe("preset catalog", () => {
     assert.equal("kind" in items[1], false);
   });
 
+  test("parses preset language defaults and exclusive choices", () => {
+    const [item] = buildPresetCatalog(fixture({
+      "language.md": preset("language", "targetLanguage: zh-HK\nallowedTargetLanguages: [zh-HK]\n"),
+    })).items as [Preset];
+    assert.equal(item.targetLanguage, "zh-HK");
+    assert.deepEqual(item.allowedTargetLanguages, ["zh-HK"]);
+    const cantonese = buildPresetCatalog().items.find((item) => item.id === "cantonese") as Preset;
+    assert.equal(cantonese.targetLanguage, "zh-HK");
+    assert.deepEqual(cantonese.allowedTargetLanguages, ["zh-HK"]);
+  });
+
   const invalid: [string, Record<string, string>][] = [
+    ["empty languages", { "a.md": preset("a", "allowedTargetLanguages: []\n") }],
+    ["invalid language", { "a.md": preset("a", "targetLanguage: invalid_code\n") }],
+    ["non-string language", { "a.md": preset("a", "targetLanguage: 42\n") }],
+    ["duplicate languages", { "a.md": preset("a", "allowedTargetLanguages: [en, en]\n") }],
+    ["disallowed default", { "a.md": preset("a", "targetLanguage: en\nallowedTargetLanguages: [zh-HK]\n") }],
     ["duplicate ids", { "a.md": preset("same"), "b/c.md": preset("same") }],
     ["unknown variables", { "a.md": preset("a", "", "{{ tonne }}") }],
     ["template syntax", { "a.md": preset("a", "", "{% if tone %}") }],

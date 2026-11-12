@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "627287471ca3a9ab",
+  "version": "ddede7a63d6a0877",
   "items": [
     {
       "type": "preset",
@@ -433,7 +433,11 @@
       "promptTitle": "Cantonese Rewrite",
       "template": "- Rewrite the source text in natural, idiomatic Hong Kong Cantonese, even when the source is in another language. Use Traditional Chinese characters by default.\n- Use colloquial written Cantonese vocabulary and sentence structure, such as 係、唔、嘅、喺、咗, where appropriate. Avoid Mandarin phrasing and formal Standard Written Chinese; do not merely convert Simplified characters to Traditional characters.\n- Preserve the author's meaning, facts, tone, level of formality, paragraph structure and intent. Use Cantonese particles naturally and sparingly; do not add jokes, slang or profanity that the source does not call for.\n- Keep proper names, links, @mentions, hashtags, code and template placeholders unchanged. Keep English terms when they sound natural in Hong Kong usage.\n- Return only the rewritten text, without explanations, romanization, pronunciation guides or a translation alongside it.\n",
       "symbol": "character.bubble",
-      "tone": "natural"
+      "tone": "natural",
+      "targetLanguage": "zh-HK",
+      "allowedTargetLanguages": [
+        "zh-HK"
+      ]
     }
   ]
 }
