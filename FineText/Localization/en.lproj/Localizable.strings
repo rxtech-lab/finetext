@@ -399,7 +399,7 @@
 "presetsLastChecked" = "Last checked";
 "never" = "Never";
 "updateNow" = "Update Now";
-"presetsDescription" = "Platform presets download from fintext.app every 4 hours and stay available offline.";
+"presetsDescription" = "Platform presets download from finetext.app every 4 hours and stay available offline.";
 "updatingPresets" = "Updating presets…";
 "presetsUpdated" = "Presets updated";
 "presetsUpToDate" = "Presets are up to date";

@@ -399,7 +399,7 @@
 "presetsLastChecked" = "上次检查";
 "never" = "从未";
 "updateNow" = "立即更新";
-"presetsDescription" = "平台预设每 4 小时从 fintext.app 下载一次，离线时也可以使用。";
+"presetsDescription" = "平台预设每 4 小时从 finetext.app 下载一次，离线时也可以使用。";
 "updatingPresets" = "正在更新预设…";
 "presetsUpdated" = "预设已更新";
 "presetsUpToDate" = "预设已是最新";

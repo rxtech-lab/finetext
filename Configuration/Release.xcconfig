@@ -1,7 +1,7 @@
 // CI overrides SPARKLE_PUBLIC_KEY with the repository variable at archive time.
 SPARKLE_PUBLIC_KEY =
 // `$()` keeps `//` from starting an xcconfig comment.
-PRESETS_URL = https:/$()/fintext.app/api/presets
+PRESETS_URL = https:/$()/finetext.app/api/presets
 // Flowcy agent API. Every configuration uses production.
 FLOWCY_BASE_URL = https:/$()/www.flowcy.dev
 // First-party rxlab-auth OAuth client for FineText (redirect finetext://oauth-callback).

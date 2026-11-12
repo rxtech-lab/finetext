@@ -9,11 +9,11 @@ FineText is a native Mac menu bar app for polishing your words and creating visu
 - **Create images** with your choice of aspect ratio, art direction, and transparent backgrounds.
 - **Choose your models:** connect an OpenAI-compatible provider, use your Codex or Claude Code setup, or download a local text model.
 
-**[Visit fintext.app for downloads and more information →](https://fintext.app)**
+**[Visit finetext.app for downloads and more information →](https://finetext.app)**
 
 ## Platform presets
 
-The platform presets in **Add Platform** are Markdown files in [`website/presets`](website/presets/README.md). Directories become menus, nested to any depth, and the preset bodies are Jinja-style templates. The website serves them at `/api/presets`. Debug builds read `http://localhost:3000/api/presets` (run `bun run dev` in `website/`), and Release builds read `https://fintext.app/api/presets`. The app checks every 4 hours and caches the last good catalog for offline use, with a bundled copy for first launch. Presets with `fields` (such as Email · Send and Reddit · Post) show each part in its own box with its own copy button. Run `python3 scripts/test-presets.py` to check the app's template renderer against the website's shared cases.
+The platform presets in **Add Platform** are Markdown files in [`website/presets`](website/presets/README.md). Directories become menus, nested to any depth, and the preset bodies are Jinja-style templates. The website serves them at `/api/presets`. Debug builds read `http://localhost:3000/api/presets` (run `bun run dev` in `website/`), and Release builds read `https://finetext.app/api/presets`. The app checks every 4 hours and caches the last good catalog for offline use, with a bundled copy for first launch. Presets with `fields` (such as Email · Send and Reddit · Post) show each part in its own box with its own copy button. Run `python3 scripts/test-presets.py` to check the app's template renderer against the website's shared cases.
 
 ## MCP server
 

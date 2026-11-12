@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!isLocale(locale)) return {};
   const guide = tutorialsFor(locale).find(item => item.slug === slug);
   if (!guide) return {};
-  return { title: `${guide.title} — FineText`, description: guide.description, alternates: { canonical: `https://fintext.app/${locale}/tutorials/${slug}` } };
+  return { title: `${guide.title} — FineText`, description: guide.description, alternates: { canonical: `https://finetext.app/${locale}/tutorials/${slug}` } };
 }
 export default async function Tutorial({ params }: Props) {
   const { locale, slug } = await params;
