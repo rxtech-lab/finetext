@@ -66,6 +66,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
       let item = RewriteItem(presetID: "message", tone: .natural, model: model)
       check(item.targetLanguage == nil, "Existing rewrites preserve their source language by default")
       check(item.outputLanguageInstruction.contains("same language"), "Default prompt preserves source language")
+      check(item.outputLanguageInstruction.contains("unless the platform guidelines explicitly request"), "Language presets can translate the source")
       item.targetLanguage = Language.named(code: "zh-Hant")
       check(item.outputLanguageInstruction.contains("Chinese (Traditional) (zh-Hant)"), "Prompt specifies the target and script")
       check(item.outputLanguageInstruction.contains("overrides language instructions"), "Target takes precedence over preset language")
@@ -99,7 +100,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
   static func bundledCatalog(_ url: URL) throws {
     let catalog = try PresetCatalog.decode(try Data(contentsOf: url))
     let entries = catalog.entries
-    check(entries.count == 22, "expected 22 presets, got \(entries.count)")
+    check(entries.count == 23, "expected 23 presets, got \(entries.count)")
     check(Set(entries.map(\.id)).count == entries.count, "duplicate preset ids")
     for id in ["x", "xReply", "emailSend", "reddit", "blog", "message", "productHuntMakerComment"] {
       check(catalog.entries.contains { $0.id == id }, "missing legacy id \(id)")
@@ -120,6 +121,9 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     check(email.preset.fields?.map(\.id) == ["subject", "body"], "email fields")
     check(email.preset.fields?.last?.multiline == true, "email body is multiline")
     check(email.preset.defaultTone == .professional, "email tone")
+    let cantonese = entries.first { $0.id == "cantonese" }!
+    check(cantonese.preset.title.resolved(for: "zh-HK") == "廣東話", "Cantonese Hong Kong title")
+    check(PresetSnapshot(cantonese).guidelines(tone: .natural).contains("Hong Kong Cantonese"), "Cantonese rewrite instructions render")
 
     // Nested menus of any depth and node types from newer catalogs.
     let nested = """
@@ -234,7 +238,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     check(offline.catalog.version == bundledVersion, "bundled fallback")
     let r1 = await offline.refresh()
     check(r1 == false && offline.lastError != nil, "offline refresh fails softly")
-    check(offline.entries.count == 22, "offline keeps presets")
+    check(offline.entries.count == 23, "offline keeps presets")
 
     // A new catalog downloads, replaces the menu and is cached for later launches.
     let fresh = """

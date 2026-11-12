@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "8844a718fdf14392",
+  "version": "627287471ca3a9ab",
   "items": [
     {
       "type": "preset",
@@ -419,6 +419,20 @@
       "promptTitle": "Message",
       "template": "- A chat message for a messaging app (iMessage, WhatsApp, Telegram, Slack DMs), written the way a real person texts the people they know.\n- Natural and spoken: contractions, everyday words, short sentences. It should sound like the author would say it out loud. Sentence fragments are fine.\n- No title, no hashtags, no Markdown, no bullet lists, no sign-off or formal greeting, no \"I hope this message finds you well\".\n- Keep it short. Break longer content into a few short lines or paragraphs instead of one block.\n- Don't sound like an announcement, an email or marketing copy. Only use an emoji if it fits naturally.\n",
       "symbol": "message",
+      "tone": "natural"
+    },
+    {
+      "type": "preset",
+      "id": "cantonese",
+      "title": {
+        "en": "Cantonese",
+        "zh-CN": "粤语",
+        "zh-HK": "廣東話",
+        "zh-TW": "粵語"
+      },
+      "promptTitle": "Cantonese Rewrite",
+      "template": "- Rewrite the source text in natural, idiomatic Hong Kong Cantonese, even when the source is in another language. Use Traditional Chinese characters by default.\n- Use colloquial written Cantonese vocabulary and sentence structure, such as 係、唔、嘅、喺、咗, where appropriate. Avoid Mandarin phrasing and formal Standard Written Chinese; do not merely convert Simplified characters to Traditional characters.\n- Preserve the author's meaning, facts, tone, level of formality, paragraph structure and intent. Use Cantonese particles naturally and sparingly; do not add jokes, slang or profanity that the source does not call for.\n- Keep proper names, links, @mentions, hashtags, code and template placeholders unchanged. Keep English terms when they sound natural in Hong Kong usage.\n- Return only the rewritten text, without explanations, romanization, pronunciation guides or a translation alongside it.\n",
+      "symbol": "character.bubble",
       "tone": "natural"
     }
   ]

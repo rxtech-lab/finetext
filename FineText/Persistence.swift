@@ -50,7 +50,7 @@ import SwiftData
   /// JSON `PresetSnapshot`, refreshed from the catalog when the rewrite is added or run.
   var presetSnapshotData: Data?
   var toneRaw = Tone.casual.rawValue
-  /// nil preserves the source language, including for rewrites saved by older builds.
+  /// nil uses the preset's language instructions, otherwise preserving the source language.
   var targetLanguageCode: String?
   var providerID = UUID()
   var modelID = ""
@@ -100,7 +100,7 @@ import SwiftData
     if let language = targetLanguage {
       return "Write the finished text in \(language.name) (\(language.code)), even when the source uses another language. This output language overrides language instructions in the platform guidelines. Preserve template placeholders, field tags, links and proper names."
     }
-    return "Write in the same language as the original text."
+    return "Write in the same language as the original text unless the platform guidelines explicitly request a specific output language; in that case, use the language requested by the platform guidelines."
   }
 
   var tone: Tone {
