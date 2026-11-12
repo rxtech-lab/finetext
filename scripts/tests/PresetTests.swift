@@ -175,6 +175,23 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     item.preset = PresetSnapshot(entry)
     item.output = model
     check(item.isGrammar && item.fields == nil && item.plainOutput == "I have two cats.", "rewrite item copies corrected text")
+    item.preset = nil
+    check(item.isGrammar && item.plainOutput == "I have two cats.", "grammar history without a snapshot stays readable")
+    var legacy = PresetSnapshot(entry)
+    legacy.kind = nil
+    item.preset = legacy
+    check(item.isGrammar && item.plainOutput == "I have two cats.", "grammar snapshot predating kind metadata")
+    legacy.kind = "rewrite"
+    item.preset = legacy
+    check(!item.isGrammar && item.plainOutput == "I have two cats.", "saved markup remains readable after preset kind changes")
+    item.customPlatformID = UUID()
+    check(!item.isGrammar, "custom platforms do not inherit the built-in grammar behavior")
+    item.output = "Tom & Jerry < 3"
+    check(item.plainOutput == item.output, "ordinary preview text is preserved")
+    item.output = model
+    let history = RefinementSession()
+    history.rewrites = [item]
+    check(history.titleSource == "\n\nI have two cats.", "history title source uses readable corrections")
     let instruction = GrammarMarkup.formatInstruction(explanationLanguage: "Chinese (Taiwan)")
     check(instruction.contains("<fix><from>") && instruction.contains("Chinese (Taiwan)"), "format instruction")
     check(GrammarMarkup.plainText(instruction.components(separatedBy: "becomes:\n").last!) == "I have two cats.", "instruction example is valid markup")

@@ -25,7 +25,7 @@ import SwiftData
   /// Bounded source keeps history title requests small, including image-only sessions.
   var titleSource: String {
     ([String(originalText.prefix(6000))]
-      + sortedRewrites.map { String($0.output.prefix(1000)) }
+      + sortedRewrites.map { String($0.plainOutput.prefix(1000)) }
       + sortedTranslations.map { String($0.output.prefix(500)) }
       + sortedImages.map { String($0.instruction.prefix(500)) })
       .joined(separator: "\n\n").prefix(12000).description
@@ -83,9 +83,16 @@ import SwiftData
   var platformSymbol: String { isCustomPlatform ? "slider.horizontal.3" : preset?.symbol ?? "text.bubble" }
   var fields: [PresetField]? { isCustomPlatform || isGrammar ? nil : preset?.fields }
   /// Grammar presets proofread the original and mark corrections inline instead of rewriting it.
-  var isGrammar: Bool { !isCustomPlatform && preset?.presetKind == .grammar }
+  var isGrammar: Bool {
+    !isCustomPlatform && (preset?.presetKind == .grammar || (platformRaw == "grammar" && preset?.kind == nil))
+  }
   /// Readable output: structured fields become labelled text and grammar markup becomes the corrected text.
-  var plainOutput: String { isGrammar ? GrammarMarkup.plainText(output) : StructuredOutput.plainText(output, fields: fields) }
+  var plainOutput: String {
+    // Saved output can outlive the preset metadata that described its format.
+    // Recognize complete corrections too, so old snapshots never expose their XML in cards or copies.
+    if isGrammar || !GrammarMarkup.fixes(in: output).isEmpty { return GrammarMarkup.plainText(output) }
+    return StructuredOutput.plainText(output, fields: fields)
+  }
   var characterLimit: Int? { isCustomPlatform ? nil : preset?.characterLimit }
   var defaultTone: Tone { isCustomPlatform ? .natural : preset?.defaultTone ?? .natural }
 

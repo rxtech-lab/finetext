@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   if (!isLocale(locale)) return {};
   const t = messages[locale];
   return {
-    metadataBase: new URL("https://fintext.app"),
+    metadataBase: new URL("https://finetext.app"),
     title: `FineText — ${t.title}`, description: t.description,
     icons: { icon: "/icon.svg", apple: "/icon.svg" },
     alternates: { canonical: `/${locale}`, languages: { en: "/en", "zh-CN": "/zh-CN", "zh-TW": "/zh-TW", "zh-HK": "/zh-HK", "x-default": "/" } },

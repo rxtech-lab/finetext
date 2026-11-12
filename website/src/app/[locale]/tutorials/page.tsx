@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const ui = tutorialUI(locale);
-  return { title: `${ui.nav} — FineText`, description: ui.intro, alternates: { canonical: `https://fintext.app/${locale}/tutorials` } };
+  return { title: `${ui.nav} — FineText`, description: ui.intro, alternates: { canonical: `https://finetext.app/${locale}/tutorials` } };
 }
 export default async function Tutorials({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
