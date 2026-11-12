@@ -102,7 +102,7 @@ describe("preset catalog", () => {
     const visit = (nodes: PresetNode[]) => nodes.forEach((node) => (node.type === "menu" ? visit(node.children) : ids.push(node.id)));
     visit(buildPresetCatalog().items);
     assert.deepEqual(ids.sort(), [
-      "blog", "emailReply", "emailSend", "grammar", "linkedin", "linkedinChat", "linkedinComment", "message",
+      "blog", "cantonese", "emailReply", "emailSend", "grammar", "linkedin", "linkedinChat", "linkedinComment", "message",
       "productHunt", "productHuntComment", "productHuntDescription", "productHuntMakerComment", "productHuntReply",
       "productHuntTagline", "reddit", "redditComment", "x", "xReply", "xThread",
       "youtubeComment", "youtubeDescription", "youtubeTitle",
