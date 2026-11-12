@@ -506,6 +506,8 @@ enum WorkTab: String, CaseIterable, Identifiable {
   }
 
   private func humanize(_ item: RewriteItem, id: UUID, options: HumanizationOptions) async throws {
+    // Round-trip translation and English scoring can undo the Cantonese rewrite.
+    guard item.isCustomPlatform || item.platformRaw != "cantonese" else { return }
     let token = taskTokens[id]
     defer {
       if taskTokens[id] == token { refinementPreviews[id] = nil }
