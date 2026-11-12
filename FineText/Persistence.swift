@@ -75,7 +75,10 @@ import SwiftData
 
   var preset: PresetSnapshot? {
     get { presetSnapshotData.flatMap { try? JSONDecoder().decode(PresetSnapshot.self, from: $0) } }
-    set { presetSnapshotData = newValue.flatMap { try? JSONEncoder().encode($0) } }
+    set {
+      presetSnapshotData = newValue.flatMap { try? JSONEncoder().encode($0) }
+      targetLanguageCode = resolvedTargetLanguageCode
+    }
   }
 
   var isCustomPlatform: Bool { customPlatformID != nil }
@@ -96,9 +99,26 @@ import SwiftData
   var characterLimit: Int? { isCustomPlatform ? nil : preset?.characterLimit }
   var defaultTone: Tone { isCustomPlatform ? .natural : preset?.defaultTone ?? .natural }
 
+  /// Preserve the Cantonese restriction for history and cached catalogs predating language metadata.
+  var allowedTargetLanguages: [Language]? {
+    guard !isCustomPlatform else { return nil }
+    let codes = preset?.allowedTargetLanguages ?? (platformRaw == "cantonese" ? ["zh-HK"] : nil)
+    return codes.flatMap { $0.isEmpty ? nil : $0.map(Language.named(code:)) }
+  }
+
+  var resolvedTargetLanguageCode: String? {
+    guard let allowed = allowedTargetLanguages else { return targetLanguageCode }
+    if let targetLanguageCode, allowed.contains(where: { $0.code == targetLanguageCode }) { return targetLanguageCode }
+    if let preferred = preset?.targetLanguage, allowed.contains(where: { $0.code == preferred }) { return preferred }
+    return allowed.first?.code
+  }
+
   var targetLanguage: Language? {
-    get { targetLanguageCode.map(Language.named(code:)) }
-    set { targetLanguageCode = newValue?.code }
+    get { resolvedTargetLanguageCode.map(Language.named(code:)) }
+    set {
+      targetLanguageCode = newValue?.code
+      targetLanguageCode = resolvedTargetLanguageCode
+    }
   }
 
   var targetLanguageTitle: String { targetLanguage?.localizedName ?? LocalizableKey.sameAsOriginal.string }

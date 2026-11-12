@@ -102,9 +102,14 @@ struct RewriteDetailView: View {
               ForEach(Tone.allCases) { Text($0.title).tag($0) }
             }
             .onChange(of: item.tone) { _, tone in preferences.setTone(tone, for: item) }
-            Picker(LocalizableKey.targetLanguage.string, selection: $item.targetLanguageCode) {
-              Text(LocalizableKey.sameAsOriginal.string).tag(String?.none)
-              ForEach(Language.all) { language in
+            Picker(LocalizableKey.targetLanguage.string, selection: Binding(
+              get: { item.resolvedTargetLanguageCode },
+              set: { item.targetLanguage = $0.map(Language.named(code:)) }
+            )) {
+              if item.allowedTargetLanguages == nil {
+                Text(LocalizableKey.sameAsOriginal.string).tag(String?.none)
+              }
+              ForEach(item.allowedTargetLanguages ?? Language.all) { language in
                 Text(language.localizedName).tag(Optional(language.code))
               }
             }

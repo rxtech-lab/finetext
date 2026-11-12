@@ -160,6 +160,8 @@ import Foundation
         "prompt_title": entry.preset.promptTitle,
         "default_tone": preferences.tone(for: entry.preset).rawValue,
       ]
+      if let language = entry.preset.targetLanguage { item["target_language"] = language }
+      if let languages = entry.preset.allowedTargetLanguages { item["allowed_target_languages"] = languages }
       if let limit = entry.preset.characterLimit { item["character_limit"] = limit }
       if let fields = entry.preset.fields {
         item["fields"] = fields.map { ["id": $0.id, "label": $0.label.english, "multiline": $0.multiline] }

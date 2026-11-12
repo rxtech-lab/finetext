@@ -52,6 +52,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     grammarMarkup(catalog: bundled)
     customPlatformTree()
     try rewriteLanguage(scratch: scratch)
+    try restrictedLanguages(catalog: bundled, scratch: scratch)
     try await store(bundled: bundled, scratch: scratch)
     print("Preset tests passed.")
   }
@@ -82,6 +83,54 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     saved?.targetLanguage = nil
     try context.save()
     check(saved?.targetLanguageCode == nil, "Same as original clears the explicit target")
+  }
+
+  @MainActor static func restrictedLanguages(catalog: URL, scratch: URL) throws {
+    let entries = try PresetCatalog.decode(Data(contentsOf: catalog)).entries
+    let entry = entries.first { $0.id == "cantonese" }!
+    let snapshot = PresetSnapshot(entry)
+    check(snapshot.targetLanguage == "zh-HK", "Cantonese declares its default target")
+    check(snapshot.allowedTargetLanguages == ["zh-HK"], "Cantonese declares its only choice")
+    let model = ModelRef(providerID: UUID(), modelID: "test")
+    let url = scratch.appending(path: "restricted-language.store")
+    do {
+      let container = try ModelContainer(for: RewriteItem.self, configurations: ModelConfiguration(url: url))
+      let context = ModelContext(container)
+      let item = RewriteItem(presetID: "cantonese", tone: .natural, model: model)
+      item.targetLanguageCode = "en" // Legacy history from before restrictions.
+      check(item.targetLanguage == .cantonese, "Old history resolves to Cantonese without a snapshot")
+      item.preset = snapshot
+      check(item.targetLanguageCode == "zh-HK", "Snapshot normalizes a stale English target")
+      item.targetLanguage = .english
+      check(item.targetLanguageCode == "zh-HK", "Disallowed target cannot override Cantonese")
+      item.targetLanguage = nil
+      check(item.targetLanguageCode == "zh-HK", "Same as original cannot override Cantonese")
+      check(item.outputLanguageInstruction.contains("Cantonese (Hong Kong) (zh-HK)"), "Prompt explicitly requests Cantonese")
+      context.insert(item)
+      try context.save()
+    }
+    let container = try ModelContainer(for: RewriteItem.self, configurations: ModelConfiguration(url: url))
+    let saved = try ModelContext(container).fetch(FetchDescriptor<RewriteItem>()).first!
+    check(saved.allowedTargetLanguages == [.cantonese], "Exclusive choices survive history reload")
+    check(saved.targetLanguageCode == "zh-HK", "Cantonese target survives history reload")
+    var generic = snapshot
+    generic.id = "multilingual"
+    generic.targetLanguage = "ja"
+    generic.allowedTargetLanguages = ["en", "ja"]
+    let item = RewriteItem(presetID: "multilingual", tone: .natural, model: model)
+    item.preset = generic
+    check(item.targetLanguage == .japanese, "Restricted preset falls back to its declared default")
+    item.targetLanguage = .english
+    check(item.targetLanguage == .english, "Multiple allowed languages remain selectable")
+    generic.targetLanguage = nil
+    item.targetLanguageCode = "fr"
+    item.preset = generic
+    check(item.targetLanguage == .english, "Missing default falls back to the first allowed language")
+    let legacy = try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as! [String: Any]
+    let oldData = try JSONSerialization.data(withJSONObject: legacy.filter { !["targetLanguage", "allowedTargetLanguages"].contains($0.key) })
+    item.platformRaw = "cantonese"
+    item.preset = try JSONDecoder().decode(PresetSnapshot.self, from: oldData)
+    check(item.targetLanguage == .cantonese, "Older snapshots decode and retain the Cantonese restriction")
   }
 
   static func templateCases(_ root: URL) throws {

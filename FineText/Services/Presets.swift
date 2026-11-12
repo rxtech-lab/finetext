@@ -69,6 +69,9 @@ struct Preset: Codable, Hashable, Sendable, Identifiable {
   var kind: String?
   var tone: String?
   var characterLimit: Int?
+  /// Default output language and optional exclusive choices, expressed as BCP-47 codes.
+  var targetLanguage: String?
+  var allowedTargetLanguages: [String]?
   var fields: [PresetField]?
   let template: String
 
@@ -176,6 +179,9 @@ struct PresetSnapshot: Codable, Hashable, Sendable {
   var kind: String?
   var tone: String?
   var characterLimit: Int?
+  /// Default output language and optional exclusive choices, expressed as BCP-47 codes.
+  var targetLanguage: String?
+  var allowedTargetLanguages: [String]?
   var fields: [PresetField]?
   var template: String
 
@@ -187,6 +193,8 @@ struct PresetSnapshot: Codable, Hashable, Sendable {
     kind = entry.preset.kind
     tone = entry.preset.tone
     characterLimit = entry.preset.characterLimit
+    targetLanguage = entry.preset.targetLanguage
+    allowedTargetLanguages = entry.preset.allowedTargetLanguages
     fields = entry.preset.fields
     template = entry.preset.template
   }

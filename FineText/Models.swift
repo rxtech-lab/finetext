@@ -117,15 +117,23 @@ struct Language: Hashable, Codable, Identifiable, Sendable {
 
   /// Localized display name; `name` stays stable for Codable and model prompts.
   var localizedName: String {
-    Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
+    if code == "zh-HK" {
+      switch Bundle.main.preferredLocalizations.first ?? "en" {
+      case "zh-CN": return "粤语（香港）"
+      case "zh-HK", "zh-TW": return "廣東話（香港）"
+      default: return "Cantonese (Hong Kong)"
+      }
+    }
+    return Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
       .localizedString(forIdentifier: code) ?? name
   }
 
   static let english = Language(code: "en", name: "English")
   static let japanese = Language(code: "ja", name: "Japanese")
+  static let cantonese = Language(code: "zh-HK", name: "Cantonese (Hong Kong)")
 
   static let all: [Language] = [
-    .english, .japanese,
+    .english, .japanese, .cantonese,
     Language(code: "zh-Hans", name: "Chinese (Simplified)"),
     Language(code: "zh-Hant", name: "Chinese (Traditional)"),
     Language(code: "ko", name: "Korean"),
