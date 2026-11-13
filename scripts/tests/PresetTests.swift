@@ -149,7 +149,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
   static func bundledCatalog(_ url: URL) throws {
     let catalog = try PresetCatalog.decode(try Data(contentsOf: url))
     let entries = catalog.entries
-    check(entries.count == 23, "expected 23 presets, got \(entries.count)")
+    check(entries.count == 24, "expected 24 presets, got \(entries.count)")
     check(Set(entries.map(\.id)).count == entries.count, "duplicate preset ids")
     for id in ["x", "xReply", "emailSend", "reddit", "blog", "message", "productHuntMakerComment"] {
       check(catalog.entries.contains { $0.id == id }, "missing legacy id \(id)")
@@ -160,6 +160,12 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     check(x.path.last!.resolved(for: "fr") == "Post", "English fallback")
     let guidelines = PresetSnapshot(x).guidelines(tone: .witty)
     check(guidelines.contains("at most 280 characters"), "character_limit renders: \(guidelines)")
+    let longPost = entries.first { $0.id == "xLongPost" }!
+    check(longPost.path.map(\.english) == ["X", "Long Post"], "X long post path")
+    check(longPost.preset.characterLimit == nil, "X long post has no short-post character limit")
+    let longGuidelines = PresetSnapshot(longPost).guidelines(tone: .witty)
+    check(longGuidelines.contains("may exceed 300 words"), "X long post supports more than 300 words")
+    check(longGuidelines.contains("not a thread"), "X long post stays a single post")
     for entry in entries {
       let rendered = PresetSnapshot(entry).guidelines(tone: entry.preset.defaultTone)
       check(!rendered.isEmpty && !rendered.contains("{{") && !rendered.contains("{%"), "\(entry.id) renders cleanly")
@@ -304,7 +310,7 @@ func check(_ condition: @autoclosure () -> Bool, _ message: String, file: Static
     check(offline.catalog.version == bundledVersion, "bundled fallback")
     let r1 = await offline.refresh()
     check(r1 == false && offline.lastError != nil, "offline refresh fails softly")
-    check(offline.entries.count == 23, "offline keeps presets")
+    check(offline.entries.count == 24, "offline keeps presets")
 
     // A new catalog downloads, replaces the menu and is cached for later launches.
     let fresh = """
