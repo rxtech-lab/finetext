@@ -120,7 +120,7 @@ describe("preset catalog", () => {
     assert.deepEqual(ids.sort(), [
       "blog", "cantonese", "emailReply", "emailSend", "grammar", "linkedin", "linkedinChat", "linkedinComment", "message",
       "productHunt", "productHuntComment", "productHuntDescription", "productHuntMakerComment", "productHuntReply",
-      "productHuntTagline", "reddit", "redditComment", "x", "xReply", "xThread",
+      "productHuntTagline", "reddit", "redditComment", "x", "xLongPost", "xReply", "xThread",
       "youtubeComment", "youtubeDescription", "youtubeTitle",
     ].sort());
   });
