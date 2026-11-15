@@ -18,8 +18,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.resolve_public_key_only
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - run: python3 -m pip install cryptography
@@ -29,7 +29,7 @@ jobs:
         run: python3 scripts/ci/resolve-sparkle-key.py
       - name: Export public key
         run: printf '%s\n' "$SPARKLE_PUBLIC_KEY" > sparkle-public-key.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sparkle-public-key
           path: sparkle-public-key.txt
@@ -45,7 +45,7 @@ jobs:
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID || 'T7GYB573Y6' }}
       SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY || secrets.SPARKLE_PUBLIC_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
@@ -61,7 +61,7 @@ jobs:
           [[ "$GITHUB_REF" == refs/tags/* && "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
           test -n "$SPARKLE_KEY" || { echo '::error::SPARKLE_KEY signing secret is required'; exit 1; }
       - run: brew install xcodegen
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - run: python3 -m pip install cryptography markdown
@@ -76,7 +76,7 @@ jobs:
           python3 scripts/ci/test_sign_sparkle.py
           python3 scripts/ci/test_select_signing_identity.py
           python3 scripts/ci/test_validate_notary.py
-      - uses: apple-actions/import-codesign-certs@v3
+      - uses: apple-actions/import-codesign-certs@v7
         with:
           keychain: finetext-release-${{ github.run_id }}-${{ github.run_attempt }}
           p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -114,7 +114,7 @@ jobs:
           gh release edit "$VERSION" --draft=false
       # Package the Pages artifact on Ubuntu, where GNU tar is available.
       - name: Upload update site for deployment
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: update-site-${{ github.run_id }}
           path: output/pages
@@ -133,14 +133,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Download update site
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: update-site-${{ github.run_id }}
           path: pages
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - name: Package Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: pages
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment
